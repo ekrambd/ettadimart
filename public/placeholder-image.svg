@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="imgBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#imgBg)"/>
+  <rect x="20" y="20" width="360" height="360" rx="16" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="6 4"/>
+  <g transform="translate(140, 130)" stroke="#94a3b8" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="8" width="112" height="88" rx="12"/>
+    <circle cx="36" cy="38" r="10"/>
+    <path d="M116 72l-32-32-44 44"/>
+    <path d="M48 84l20-20 20 20"/>
+  </g>
+  <text x="200" y="270" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#64748b" letter-spacing="0.3">No Image Setup</text>
+  <text x="200" y="292" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#94a3b8">Upload image in Admin Panel</text>
+</svg>

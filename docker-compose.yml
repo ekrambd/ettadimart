@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Nginx Load Balancer Reverse Proxy
+  loadbalancer:
+    image: nginx:alpine
+    container_name: noor_loadbalancer
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - node1
+      - node2
+      - node3
+    restart: always
+
+  # Backend Server Instance 1
+  node1:
+    build: .
+    container_name: noor_server_1
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - SERVER_INSTANCE_ID=node-1
+    restart: always
+
+  # Backend Server Instance 2
+  node2:
+    build: .
+    container_name: noor_server_2
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - SERVER_INSTANCE_ID=node-2
+    restart: always
+
+  # Backend Server Instance 3
+  node3:
+    build: .
+    container_name: noor_server_3
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - SERVER_INSTANCE_ID=node-3
+    restart: always

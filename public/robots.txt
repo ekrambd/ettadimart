@@ -1,0 +1,36 @@
+# Robots.txt for SHOSTIR BAZAR (swastirbazar.com)
+# Optimized for Search Engines (SEO), Answer Engines (AEO), and Generative AI Engines (GEO)
+
+User-agent: Googlebot
+User-agent: Googlebot-Image
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+User-agent: YandexBot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Generative AI & Answer Engine Crawlers (GEO / AEO)
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Amazonbot
+User-agent: FacebookBot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Global Default
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# XML Sitemap
+Sitemap: https://shostirbazar.com/sitemap.xml

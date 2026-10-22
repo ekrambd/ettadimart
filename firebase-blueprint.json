@@ -1,0 +1,231 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Ecommerce product information",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 200 },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "stock": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["title", "price"]
+    },
+    "BookOrder": {
+      "title": "Book Order",
+      "description": "Ecommerce order details",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "mobile": { "type": "string", "minLength": 11, "maxLength": 15 },
+        "address": { "type": "string", "minLength": 5, "maxLength": 300 },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Processing", "Shipped", "Delivered", "Cancelled", "Returned"] },
+        "paymentMethod": { "type": "string", "enum": ["COD", "bKash", "Nagad"] },
+        "trxId": { "type": "string" },
+        "senderPhone": { "type": "string" },
+        "courierName": { "type": "string" },
+        "courierTrackingCode": { "type": "string" }
+      },
+      "required": ["customerName", "mobile", "address", "totalPrice", "status"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Ecommerce customer information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "phone": { "type": "string", "minLength": 11, "maxLength": 15 },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "totalOrders": { "type": "number" },
+        "totalSpent": { "type": "number" }
+      },
+      "required": ["name", "phone"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Information about registered students",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the student",
+          "maxLength": 100,
+          "minLength": 2
+        },
+        "fatherName": {
+          "type": "string",
+          "description": "Father's name of the student",
+          "maxLength": 100,
+          "minLength": 2
+        },
+        "motherName": {
+          "type": "string",
+          "description": "Mother's name of the student",
+          "maxLength": 100,
+          "minLength": 2
+        },
+        "mobile": {
+          "type": "string",
+          "description": "Mobile number of the student",
+          "maxLength": 15,
+          "minLength": 11,
+          "pattern": "^[0-9+]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the student",
+          "maxLength": 100,
+          "minLength": 5
+        },
+        "address": {
+          "type": "string",
+          "description": "Mailing address of the student",
+          "maxLength": 300,
+          "minLength": 5
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "ISO date of student registration"
+        },
+        "status": {
+          "type": "string",
+          "description": "Active or inactive status of the student",
+          "enum": ["active", "inactive"]
+        }
+      },
+      "required": ["name", "fatherName", "motherName", "mobile", "status"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "Registrations of students in specific courses",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "description": "The ID of the student"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "The cached student name"
+        },
+        "courseId": {
+          "type": "string",
+          "description": "The course code/ID"
+        },
+        "courseTitle": {
+          "type": "string",
+          "description": "The cached course title"
+        },
+        "batch": {
+          "type": "string",
+          "description": "The batch name/schedule",
+          "maxLength": 100
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "ISO date of registration"
+        },
+        "status": {
+          "type": "string",
+          "description": "Approval status of registration",
+          "enum": ["Pending", "Approved", "Rejected"]
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "The tuition fee amount paid so far"
+        }
+      },
+      "required": ["studentId", "courseId", "status", "amountPaid"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Official training certificates generated for students",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "description": "The student ID who earned this certificate"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Cached name of the student"
+        },
+        "fatherName": {
+          "type": "string",
+          "description": "Cached father's name"
+        },
+        "motherName": {
+          "type": "string",
+          "description": "Cached mother's name"
+        },
+        "courseTitle": {
+          "type": "string",
+          "description": "Cached course title completed"
+        },
+        "duration": {
+          "type": "string",
+          "description": "Course duration completed"
+        },
+        "grade": {
+          "type": "string",
+          "description": "Awarded letter grade",
+          "maxLength": 10
+        },
+        "score": {
+          "type": "string",
+          "description": "Percentage score, e.g., '৮৫%' or GPA",
+          "maxLength": 20
+        },
+        "rollNo": {
+          "type": "string",
+          "description": "Student roll number"
+        },
+        "regNo": {
+          "type": "string",
+          "description": "Student registration number"
+        },
+        "issueDate": {
+          "type": "string",
+          "description": "ISO date of issue"
+        },
+        "batch": {
+          "type": "string",
+          "description": "Batch reference"
+        }
+      },
+      "required": ["studentId", "studentName", "courseTitle", "grade", "score", "rollNo", "regNo", "issueDate"]
+    }
+  },
+  "firestore": {
+    "products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Ecommerce store products"
+    },
+    "book_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/BookOrder" },
+      "description": "Ecommerce customer orders"
+    },
+    "customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Ecommerce customers list"
+    },
+    "students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Primary student profiles list"
+    },
+    "registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/Registration" },
+      "description": "Student-course registration mappings"
+    },
+    "certificates/{certificateId}": {
+      "schema": { "$ref": "#/entities/Certificate" },
+      "description": "Official generated certificates issued to students"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Certificate Generator System",
+  "description": "Full e-commerce store, order & customer management, and certificate verification system built for Noor Digital Land Survey Training Institute.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

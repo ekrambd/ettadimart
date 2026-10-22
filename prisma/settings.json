@@ -1,0 +1,198 @@
+{
+  "storeName": "SHOSTIR BAZAR",
+  "storeLogo": "/uploads/file-1792215004226-886642061.jpg",
+  "storeFavicon": "/uploads/file-1792215009696-613126128.jpg",
+  "favicon": "/uploads/file-1792215009696-613126128.jpg",
+  "storeTagline": "COMFORT TO WELLNESS",
+  "gtmId": "",
+  "deliveryChargeInsideDhaka": 70,
+  "deliveryChargeOutsideDhaka": 110,
+  "bkashNumber": "",
+  "nagadNumber": "",
+  "categories": [
+    "ghee"
+  ],
+  "categoryItems": [
+    {
+      "id": "cat-1792255796820",
+      "name": "ghee",
+      "order": 0,
+      "subcategories": []
+    }
+  ],
+  "heroBanners": [],
+  "promoCards": [],
+  "companyName": "SHOSTIR BAZAR",
+  "topAnnouncementText": "WELCOME TO SHOSTIR BAZAR",
+  "contactEmail": "sostirbazar@gmail.com",
+  "contactPhone": "01859776717",
+  "storeAddress": "Dhaka,Bangladesh",
+  "footerDescription": "COMFORT TO WELLNESS",
+  "socialLinks": {
+    "facebook": "",
+    "instagram": "",
+    "youtube": "",
+    "whatsapp": ""
+  },
+  "primaryColor": "#0f766e",
+  "paymentGateways": [
+    {
+      "id": "gw-1",
+      "title": "Cash on Delivery",
+      "type": "Cash on Delivery",
+      "status": "Active",
+      "transactionFee": 0,
+      "discountAmount": 0,
+      "priority": 1,
+      "instruction": "Pay with cash upon delivery of your order.",
+      "updatedAt": "10/17/2026",
+      "accountNumber": ""
+    }
+  ],
+  "deliveryMethods": [
+    {
+      "id": "dm-1",
+      "title": "Inside Dhaka",
+      "status": "Active",
+      "mode": "Fixed",
+      "type": "Fixed",
+      "minimumCharge": 0,
+      "maximumCharge": 0,
+      "deliveryCharge": 70,
+      "updatedAt": "10/17/2026"
+    },
+    {
+      "id": "dm-2",
+      "title": "Outside Dhaka",
+      "status": "Active",
+      "mode": "Fixed",
+      "type": "Fixed",
+      "minimumCharge": 0,
+      "maximumCharge": 0,
+      "deliveryCharge": 110,
+      "updatedAt": "10/17/2026"
+    }
+  ],
+  "showViewCountOnWebsite": false,
+  "websiteViewsCount": 0,
+  "landingViewsCount": 0,
+  "aboutSettings": {
+    "title": "about us",
+    "subtitle": "",
+    "content": "Sosthir bazar",
+    "image": "",
+    "badge": "CLINICAL K-BEAUTY & BOTANICAL SCIENCE",
+    "heroTitle": "about us",
+    "heroSubtitle": "",
+    "heroImage": "",
+    "storyBadge": "PHILOSOPHY & LEGACY",
+    "storyTitle": "Clinical Botanical Purity with Proven Results",
+    "storySubtitle": "From Gangnam Research Labs to Global Beauty Aficionados",
+    "storyParagraph1": "Sosthir bazar",
+    "storyParagraph2": "Our dedicated laboratories in Seoul adhere to the strictest dermatological standards, ensuring micro-molecular absorption, continuous 72-hour moisture lock, and noticeable clinical fading of hyperpigmentation in 28 days.",
+    "storyParagraph3": "Every formulation is 100% cruelty-free, paraben-free, dermatologist-tested, and certified under Korean KFDA clean beauty standards.",
+    "storyImage": "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=1000&auto=format&fit=crop&q=85",
+    "pillarsTitle": "Our Four Pillars of Dermal Excellence",
+    "pillarsSubtitle": "Bridging timeless Korean wellness traditions with cutting-edge dermatology",
+    "pillars": [
+      {
+        "id": "p1",
+        "badge": "HERITAGE",
+        "title": "Hanbang Herbal Synergy",
+        "description": "Authentic Korean herbal medicine principles blended for cellular vitality, barrier defense, and deep radiant clarity.",
+        "icon": "Sprout"
+      },
+      {
+        "id": "p2",
+        "badge": "BIOTECH",
+        "title": "Micro Bio-Fermentation",
+        "description": "Micro-molecular cold fermentation allowing active nutrients to penetrate up to 10 dermal layers deep effortlessly.",
+        "icon": "FlaskConical"
+      },
+      {
+        "id": "p3",
+        "badge": "CLEAN DERMA",
+        "title": "EWG Green & Cruelty-Free",
+        "description": "Dermatologist-formulated with zero harsh parabens, artificial fragrances, or sulfates. Safe for the most sensitive skin.",
+        "icon": "ShieldCheck"
+      },
+      {
+        "id": "p4",
+        "badge": "RESTORATION",
+        "title": "5-Tier Barrier Defense",
+        "description": "Multi-molecular ceramides and phytosphingosine engineered to lock in deep hydration for 72 hours continuously.",
+        "icon": "Layers"
+      }
+    ],
+    "hqTitle": "Brandini Co., Ltd. Seoul Headquarters",
+    "hqSubtitle": "Global R&D Center & Innovation Hub",
+    "hqAddress": "9F, Gangnamjeil Bldg, 109, Teheran-ro, Gangnam-gu, Seoul, Republic of Korea",
+    "hqImage": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=85",
+    "missionStatement": "",
+    "founderQuote": "True skin radiance is not an overnight illusion, but a harmonious balance between natural botanical resilience and scientific dermal precision.",
+    "founderName": "FANTINE Dermal Research Institute",
+    "founderTitle": "Clinical Formulation & Botanical Science Division",
+    "founderImage": "https://images.unsplash.com/photo-1594824813589-980f745e69e8?w=800&auto=format&fit=crop&q=85",
+    "stats": [
+      {
+        "id": "s1",
+        "value": "28 Days",
+        "label": "Skin Renewal Cycle"
+      },
+      {
+        "id": "s2",
+        "value": "100%",
+        "label": "K-Clean Certified"
+      },
+      {
+        "id": "s3",
+        "value": "5-Tier",
+        "label": "Ceramide Barrier Defense"
+      },
+      {
+        "id": "s4",
+        "value": "15+",
+        "label": "Herbal Bio-Actives"
+      }
+    ]
+  },
+  "flashSale": {
+    "enabled": true,
+    "productId": "prod-1792007690982",
+    "badgeTag": "",
+    "title": "সুন্দরবনের খলিশা ফুলের মধু।",
+    "subtitle": "",
+    "customImage": "",
+    "flashPrice": 1200,
+    "originalPrice": 1250,
+    "endDate": "2026-10-30T16:49:00.000Z",
+    "buttonText": "SHOP NOW",
+    "showVideoSection": false,
+    "videoTitle": "",
+    "videoSubtitle": "",
+    "videoType": "file",
+    "videoUrl": ""
+  },
+  "highlightSpotlight": {
+    "enabled": false,
+    "targetType": "product",
+    "productId": "",
+    "categoryName": "",
+    "badgeTag": "",
+    "title": "",
+    "subtitle": "",
+    "customImage": "",
+    "buttonText": "BUY NOW",
+    "buttonLink": ""
+  },
+  "maintenanceMode": false,
+  "hotlinePhone": "09678812525",
+  "whatsappNumber": "",
+  "calloutBannerText": "Have any questions? Inquire about orders, products or delivery directly",
+  "calloutBannerSubtext": "Our customer support and WhatsApp team are always ready to assist you",
+  "showCalloutBanner": true,
+  "heroBannerLeftImage": "/uploads/file-1792185577063-331672488.jpg",
+  "heroBannerLeftLink": "",
+  "heroBannerRightImage": "/uploads/file-1792185581499-616845250.jpg",
+  "heroBannerRightLink": ""
+}

@@ -1,0 +1,238 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id                 String   @id @default(cuid())
+  title              String
+  subtitle           String?
+  sku                String?
+  price              Float
+  regularPrice       Float?
+  costPrice          Float?
+  hasVariants        Boolean? @default(false)
+  variants           String?  // Storing JSON string for now
+  image              String?
+  category           String
+  subCategory        String?
+  brand              String?
+  brandId            String?
+  stock              Int?     @default(0)
+  openingStock       Int?
+  receivedStock      Int?
+  soldStock          Int?
+  returnedStock      Int?
+  damagedStock       Int?
+  transferredStock   Int?
+  reservedStock      Int?
+  reorderPoint       Int?
+  isAvailable        Boolean? @default(true)
+  description        String?
+  ingredients        String?
+  benefitsHighlights String?
+  howToUseIt         String?
+  specs              String?  // Storing JSON array as string
+  features           String?  // Storing JSON array as string
+  tableOfContents    String?  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  viewsCount         Int      @default(0)
+  
+  productType        String?
+  translation        String?
+  barcode            String?
+  shortSummary       String?
+  vatPercent         Float?
+  authorName         String?
+  pdfUrl             String?
+  slug               String?
+}
+
+model Order {
+  id                 String   @id @default(cuid())
+  productId          String?
+  productName        String?
+  customerName       String
+  email              String?
+  couponCode         String?
+  couponDiscount     Float?
+  paymentGateway     String?
+  deliveryFee        Float?
+  phone              String
+  address            String
+  deliveryZone       String?
+  district           String?
+  thana              String?
+  deliveryArea       String?
+  productTitle       String?
+  price              Float?
+  unitPrice          Float?
+  deliveryCharge     Float    @default(0)
+  quantity           Int      @default(1)
+  items              String?  // Storing JSON array as string for CartItems
+  totalPrice         Float?
+  totalAmount        Float?
+  paymentMethod      String?
+  trxId              String?
+  senderPhone        String?
+  orderType          String?
+  source             String?
+  status             String?  @default("Pending")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Setting {
+  id    String @id @default("global")
+  value String // JSON string
+}
+
+model Category {
+  id            String   @id @default(cuid())
+  name          String
+  order         Int?     @default(0)
+  image         String?
+  icon          String?
+  subcategories String?  // JSON string
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Slider {
+  id             String   @id @default(cuid())
+  title          String
+  subtitle       String
+  badge          String?
+  discountText   String?
+  showDiscount   Boolean? @default(false)
+  imageOnly      Boolean? @default(false)
+  bgGradient     String?
+  imageUrl       String?
+  mobileImageUrl String?
+  link           String?
+  actionType     String?
+  productId      String?
+  mediaType      String?  @default("image")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String   @unique
+  email          String?
+  address        String?
+  district       String?
+  registeredAt   DateTime @default(now())
+  totalOrders    Int?     @default(0)
+  totalSpent     Float?   @default(0)
+  pointsBalance  Int?     @default(0)
+  pointsSpent    Int?     @default(0)
+  password       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Coupon {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  title           String
+  discount        Float
+  maxDiscount     Float?
+  minimumSpent    Float?
+  usageLimit      Int?
+  usageCount      Int      @default(0)
+  endDate         DateTime?
+  type            String   @default("fixed") // 'fixed' | 'percentage'
+  status          String   @default("Active") // 'Active' | 'Inactive'
+  visibility      String   @default("Public") // 'Public' | 'Private'
+  oncePerCustomer Boolean? @default(false)
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  productId      String
+  productTitle   String?
+  productImage   String?
+  customerName   String
+  customerPhone  String
+  email          String?
+  rating         Int
+  comment        String
+  images         String?  // JSON string array
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String
+  logo        String?
+  description String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  status    String   @default("Unread") // Unread, Read, Responded
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstituteInfo {
+  id                String   @id @default("global")
+  name              String?
+  logo              String?
+  address           String?
+  phone             String?
+  email             String?
+  website           String?
+  facebook          String?
+  youtube           String?
+  aboutUs           String?  // JSON or long text
+  termsAndConditions String? // JSON or long text
+  privacyPolicy     String?  // JSON or long text
+  returnPolicy      String?  // JSON or long text
+  updatedAt         DateTime @updatedAt
+}
+
+model LandingPage {
+  id                 String   @id // product slug or productId
+  productId          String?
+  slug               String?  @unique
+  isEnabled          Boolean  @default(true)
+  heroTitle          String?
+  heroSubtitle       String?
+  heroDescription    String?
+  heroImage          String?
+  videoUrl           String?
+  features           String?  // JSON string
+  benefits           String?  // JSON string
+  testimonials       String?  // JSON string
+  faqs               String?  // JSON string
+  pricing            String?  // JSON string
+  relatedProductIds  String?  // JSON string array
+  campaignTickerText String?
+  campaignBannerTitle String?
+  campaignCouponNote  String?
+  luckyDrawTitle     String?
+  luckyDrawSubtitle  String?
+  luckyDrawRules     String?  // JSON string array
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
