@@ -219,7 +219,28 @@
     </script>
   </head>
   <body class="bg-[#faf9f6] text-slate-900 antialiased selection:bg-rose-100 selection:text-rose-900 font-sans">
-    <div id="root"></div>
+    <div id="root">
+      <div id="ettadi-initial-loader" style="position:fixed;inset:0;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <div style="position:relative;width:68px;height:68px;display:flex;align-items:center;justify-content:center;">
+          <div style="width:68px;height:68px;border-radius:50%;border:3.5px solid rgba(243,112,34,0.18);border-top-color:#F37022;animation:ettadiSpin 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
+          <img src="/ettadimart-favicon.svg" alt="EttadiMart" style="position:absolute;width:34px;height:34px;object-fit:contain;" />
+        </div>
+        <div style="margin-top:18px;text-align:center;">
+          <div style="font-size:15px;font-weight:900;color:#0F172A;letter-spacing:0.5px;">
+            ETTADI <span style="color:#F37022;">MART</span>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:#64748B;margin-top:3px;letter-spacing:0.3px;">
+            চায়না ট্রেন্ডি গ্যাজেটস ও ভ্যারাইটিজ শপ
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes ettadiSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {

@@ -151,8 +151,19 @@ function AppRoutes() {
     <div className="bg-[#faf9f6] min-h-screen text-slate-900">
       <DynamicFaviconSync ecomSettings={ecomSettings} />
       <Suspense fallback={
-        <div className="min-h-screen bg-[#faf9f6] flex flex-col items-center justify-center space-y-3">
-          <div className="w-8 h-8 border-2 border-[#111827] border-t-transparent rounded-full animate-spin"></div>
+        <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4">
+          <div className="relative flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border-[3.5px] border-[#F37022]/20 border-t-[#F37022] animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src="/ettadimart-favicon.svg" alt="EttadiMart" className="w-8 h-8 object-contain" />
+            </div>
+          </div>
+          <div className="text-center space-y-0.5">
+            <div className="text-sm font-black text-slate-900 tracking-wide">
+              ETTADI <span className="text-[#F37022]">MART</span>
+            </div>
+            <div className="text-[11px] font-medium text-slate-400">Loading store...</div>
+          </div>
         </div>
       }>
         <main className="flex-1 w-full">

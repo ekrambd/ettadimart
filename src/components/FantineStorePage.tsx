@@ -721,6 +721,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     loadLiveProducts();
     loadLiveSettings();
 
+    const failsafe = setTimeout(() => {
+      setIsLoadingProducts(false);
+    }, 3000);
+
     const handleProductUpdate = () => {
       loadLiveProducts();
     };
@@ -733,6 +737,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     window.addEventListener('institute-info-updated', handleSettingsUpdate);
     window.addEventListener('storage', handleProductUpdate);
     return () => {
+      clearTimeout(failsafe);
       window.removeEventListener('ecom-products-updated', handleProductUpdate);
       window.removeEventListener('ecom-settings-updated', handleSettingsUpdate);
       window.removeEventListener('institute-info-updated', handleSettingsUpdate);
@@ -1703,6 +1708,32 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     }
     return imgs.length > 0 ? imgs : ['/placeholder-image.svg'];
   }, [activeProductDetail]);
+
+  // Branded Circular Loader on initial store load (prevents empty flashes before data arrives)
+  if (isLoadingProducts && products.length === 0) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4 selection:bg-orange-100">
+        <div className="relative flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full border-[3.5px] border-[#F37022]/20 border-t-[#F37022] animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img 
+              src="/ettadimart-favicon.svg" 
+              alt={displayStoreName || "EttadiMart"} 
+              className="w-8 h-8 object-contain" 
+            />
+          </div>
+        </div>
+        <div className="text-center space-y-1">
+          <div className="text-base font-black text-slate-900 tracking-wide">
+            ETTADI <span className="text-[#F37022]">MART</span>
+          </div>
+          <div className="text-xs font-semibold text-slate-500">
+            {displayTagline || "চায়না ট্রেন্ডি গ্যাজেটস ও ভ্যারাইটিজ শপ"}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative selection:bg-orange-100 selection:text-orange-950 pb-16 md:pb-0">
