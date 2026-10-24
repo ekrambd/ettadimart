@@ -524,13 +524,43 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 15;
 
-  // Dynamic Ecom Settings for Hero Banners & Videos
-  const [ecomSettings, setEcomSettings] = useState<EcomSettings | null>(null);
-  const [instituteInfo, setInstituteInfo] = useState<InstituteInfo | null>(null);
+  // Dynamic Ecom Settings with instant session rehydration
+  const [ecomSettings, setEcomSettings] = useState<EcomSettings | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('ettadi_cached_settings');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
+  const [instituteInfo, setInstituteInfo] = useState<InstituteInfo | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('ettadi_cached_info');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
 
-  // Dynamic Product State from Admin / DB (No Seed Data Overwriting)
-  const [products, setProducts] = useState<FantineProductItem[]>([]);
+  // Dynamic Product State from Admin / DB with instant session rehydration
+  const [products, setProducts] = useState<FantineProductItem[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('ettadi_cached_products');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((p, idx) => normalizeFantineProduct(p, idx));
+        }
+      }
+    } catch {}
+    return [];
+  });
+  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(() => {
+    try {
+      const cached = sessionStorage.getItem('ettadi_cached_products');
+      if (cached && JSON.parse(cached)?.length > 0) return false;
+    } catch {}
+    return true;
+  });
 
   // Helper to find matching product from URL path or router params (supports /product/:slug and legacy /product/:slug/:id)
   const findProductFromPath = useCallback((path: string, slugParam?: string, idParam?: string, productList: FantineProductItem[] = products) => {
@@ -596,8 +626,14 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
         (await import('../lib/dbService')).dbService.getEcomSettings().catch(() => null),
         (await import('../lib/dbService')).dbService.getInstituteInfo().catch(() => null)
       ]);
-      if (settings) setEcomSettings(settings);
-      if (info) setInstituteInfo(info);
+      if (settings) {
+        setEcomSettings(settings);
+        try { sessionStorage.setItem('ettadi_cached_settings', JSON.stringify(settings)); } catch {}
+      }
+      if (info) {
+        setInstituteInfo(info);
+        try { sessionStorage.setItem('ettadi_cached_info', JSON.stringify(info)); } catch {}
+      }
     } catch {
       // ignore
     }
@@ -609,66 +645,79 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
       ]);
       if (pubSettings) {
         setEcomSettings(prev => prev || pubSettings);
+        try { sessionStorage.setItem('ettadi_cached_settings', JSON.stringify(pubSettings)); } catch {}
       }
       if (pubInfo) {
         setInstituteInfo(prev => prev || pubInfo);
+        try { sessionStorage.setItem('ettadi_cached_info', JSON.stringify(pubInfo)); } catch {}
       }
     } catch {
       // ignore
     }
   };
 
-  // Sync Live Products from dbService & publicStoreService
+  // Sync Live Products from dbService & publicStoreService with resilience & retries
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const loadLiveProducts = async () => {
-    try {
-      const dbProds = await dbService.getProducts();
-      if (Array.isArray(dbProds)) {
-        const normalized = dbProds.map((p, idx) => normalizeFantineProduct(p, idx));
-        setProducts(normalized);
-        setActiveProductDetail(prev => {
-          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product')) {
-            const urlMatch = findProductFromPath(window.location.pathname, routeSlug, routeId, normalized);
-            if (urlMatch) return urlMatch;
-          }
-          const match = normalized.find(p => p.id === prev?.id);
-          return match || normalized[0] || null;
-        });
-        return;
+  const loadLiveProducts = async (retries = 3) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const dbProds = await dbService.getProducts();
+        if (Array.isArray(dbProds) && dbProds.length > 0) {
+          const normalized = dbProds.map((p, idx) => normalizeFantineProduct(p, idx));
+          setProducts(normalized);
+          setIsLoadingProducts(false);
+          try {
+            sessionStorage.setItem('ettadi_cached_products', JSON.stringify(dbProds));
+          } catch {}
+          setActiveProductDetail(prev => {
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product')) {
+              const urlMatch = findProductFromPath(window.location.pathname, routeSlug, routeId, normalized);
+              if (urlMatch) return urlMatch;
+            }
+            const match = normalized.find(p => p.id === prev?.id);
+            return match || normalized[0] || null;
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn(`Product fetch attempt ${attempt} failed:`, err);
       }
-    } catch (err) {
-      console.warn('Failed loading from dbService:', err);
+
+      try {
+        const pubProds = await publicStoreService.getProducts();
+        if (Array.isArray(pubProds) && pubProds.length > 0) {
+          const normalized = pubProds.map((p, idx) => normalizeFantineProduct(p, idx));
+          setProducts(normalized);
+          setIsLoadingProducts(false);
+          try {
+            sessionStorage.setItem('ettadi_cached_products', JSON.stringify(pubProds));
+          } catch {}
+          setActiveProductDetail(prev => {
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product')) {
+              const urlMatch = findProductFromPath(window.location.pathname, routeSlug, routeId, normalized);
+              if (urlMatch) return urlMatch;
+            }
+            const match = normalized.find(p => p.id === prev?.id);
+            return match || normalized[0] || null;
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn(`publicStoreService fetch attempt ${attempt} failed:`, err);
+      }
+
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, attempt * 400));
+      }
     }
 
-    try {
-      const pubProds = await publicStoreService.getProducts();
-      if (Array.isArray(pubProds)) {
-        const normalized = pubProds.map((p, idx) => normalizeFantineProduct(p, idx));
-        setProducts(normalized);
-        setActiveProductDetail(prev => {
-          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product')) {
-            const urlMatch = findProductFromPath(window.location.pathname, routeSlug, routeId, normalized);
-            if (urlMatch) return urlMatch;
-          }
-          const match = normalized.find(p => p.id === prev?.id);
-          return match || normalized[0] || null;
-        });
-      }
-    } catch (err) {
-      console.warn('Failed loading from publicStoreService:', err);
-      setProducts([]);
-    }
+    // Done all retries
+    setIsLoadingProducts(false);
   };
 
   useEffect(() => {
-    try {
-      localStorage.removeItem('noor_ecom_products');
-      localStorage.removeItem('noor_ecom_settings');
-      localStorage.removeItem('noor_book_orders');
-    } catch {}
-
     loadLiveProducts();
     loadLiveSettings();
 
@@ -2546,16 +2595,27 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             </section>
           )}
         </div>
+        ) : isLoadingProducts ? (
+          <div className="py-12 max-w-7xl mx-auto px-4 sm:px-8 animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="aspect-square bg-slate-100 rounded-[6px]" />
+              <div className="space-y-4">
+                <div className="h-8 bg-slate-100 rounded-[4px] w-3/4" />
+                <div className="h-6 bg-slate-100 rounded-[4px] w-1/3" />
+                <div className="h-24 bg-slate-100 rounded-[6px] w-full" />
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="py-24 max-w-7xl mx-auto px-4 sm:px-8 text-center space-y-4">
             <Package className="w-12 h-12 text-slate-300 mx-auto" />
-            <h2 className="font-serif text-xl font-bold text-slate-800">No data setup now</h2>
+            <h2 className="font-serif text-xl font-bold text-slate-800">পণ্যটি পাওয়া যায়নি</h2>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              This product formulation is not available or has not been set up yet.
+              অনুরোধকৃত পণ্যটি এই মুহূর্তে পাওয়া যাচ্ছে না। আমাদের শপে থাকা অন্যান্য প্রোডাক্টগুলো দেখতে পারেন।
             </p>
             <button 
               onClick={() => navigateTo('shop')}
-              className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition-colors"
+              className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-[#F37022] hover:bg-[#DE5A0E] text-white text-xs font-semibold rounded-[6px] transition-colors cursor-pointer"
             >
               Browse Shop
             </button>
@@ -2796,7 +2856,18 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
               </div>
 
               {/* Product Grid or Empty State (2-cols on mobile, 3-cols on tablet/desktop) */}
-              {paginatedProducts.length > 0 ? (
+              {isLoadingProducts && products.length === 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 animate-pulse">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-white border border-slate-200/80 rounded-[6px] p-3 space-y-3 shadow-2xs">
+                      <div className="w-full aspect-square bg-slate-100 rounded-[6px]" />
+                      <div className="h-4 bg-slate-100 rounded-[4px] w-3/4" />
+                      <div className="h-4 bg-slate-100 rounded-[4px] w-1/2" />
+                      <div className="h-8 bg-slate-100 rounded-[6px] w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : paginatedProducts.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                   {paginatedProducts.map((product) => (
                     <PahariyaProductCard
@@ -2815,7 +2886,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   ))}
                 </div>
               ) : products.length === 0 ? (
-                <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-4">
+                <div className="bg-white p-12 text-center rounded-[6px] border border-slate-200 space-y-4">
                   <Package className="w-12 h-12 text-slate-300 mx-auto" />
                   <div className="space-y-1">
                     <h3 className="font-serif text-lg font-bold text-slate-800">
@@ -3275,7 +3346,23 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
               ============================================================ */}
           <section className="pt-8 sm:pt-10 pb-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-8">
-              {products.length > 0 ? (
+              {isLoadingProducts && products.length === 0 ? (
+                <>
+                  <div className="mb-6">
+                    <div className="h-6 w-48 bg-slate-200 rounded-[6px] animate-pulse" />
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 animate-pulse">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="bg-white border border-slate-200/80 rounded-[6px] p-3 space-y-3 shadow-2xs">
+                        <div className="w-full aspect-square bg-slate-100 rounded-[6px]" />
+                        <div className="h-4 bg-slate-100 rounded-[4px] w-3/4" />
+                        <div className="h-4 bg-slate-100 rounded-[4px] w-1/2" />
+                        <div className="h-8 bg-slate-100 rounded-[6px] w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : products.length > 0 ? (
                 <>
                   {/* Section Header */}
                   <div className="mb-6">
