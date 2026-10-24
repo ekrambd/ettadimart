@@ -182,6 +182,19 @@ function AppRoutes() {
             <Route path="/product_385231.html" element={<Navigate to="/product/rapid-acne-treatment-toner/product_385231" replace />} />
             <Route path="/product_*.html" element={<Navigate to="/shop" replace />} />
 
+            {/* Policy, Legal & Support Canonical Redirects (Prevents falling back to book landing) */}
+            <Route path="/privacy-policy" element={<Navigate to="/about" replace />} />
+            <Route path="/privacy" element={<Navigate to="/about" replace />} />
+            <Route path="/terms" element={<Navigate to="/about" replace />} />
+            <Route path="/terms-and-conditions" element={<Navigate to="/about" replace />} />
+            <Route path="/terms-of-service" element={<Navigate to="/about" replace />} />
+            <Route path="/return-policy" element={<Navigate to="/about" replace />} />
+            <Route path="/refund-policy" element={<Navigate to="/about" replace />} />
+            <Route path="/shipping-policy" element={<Navigate to="/about" replace />} />
+            <Route path="/faq" element={<Navigate to="/about" replace />} />
+            <Route path="/support" element={<Navigate to="/contact" replace />} />
+            <Route path="/help" element={<Navigate to="/contact" replace />} />
+
             {/* Customer Account & Order Tracking */}
             <Route path="/track-order" element={
               <LoginPage 

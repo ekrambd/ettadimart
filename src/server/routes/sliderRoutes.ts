@@ -6,7 +6,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 export const sliderRouter = Router();
 
 // GET all sliders
-sliderRouter.get('/', cacheResponse({ ttlSeconds: 60, staleWhileRevalidateSeconds: 120, tag: 'sliders' }), async (req, res) => {
+sliderRouter.get('/', async (req, res) => {
   try {
     const items = await prisma.slider.findMany();
     res.json(items);

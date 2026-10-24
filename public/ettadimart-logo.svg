@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 72" width="320" height="72">
+  <defs>
+    <linearGradient id="bagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F37022"/>
+      <stop offset="100%" stop-color="#DE5A0E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left: Shopping Bag Emblem with 'E' monogram inside -->
+  <g transform="translate(4, 6)">
+    <!-- Bag Handle -->
+    <path d="M 18 18 C 18 8, 38 8, 38 18" fill="none" stroke="#F37022" stroke-width="4" stroke-linecap="round"/>
+    <!-- Bag Body with gradient and rounded corners -->
+    <rect x="4" y="16" width="48" height="44" rx="10" fill="none" stroke="url(#bagGrad)" stroke-width="4" stroke-linejoin="round"/>
+    
+    <!-- Stylized Modern 'E' inside bag -->
+    <path d="M 21 28 C 21 24, 25 22, 31 22 L 39 22 C 43 22, 45 25, 45 28 L 29 28 L 29 33 L 37 33 C 42 33, 44 36, 44 39 L 29 39 L 29 46 L 41 46 C 45 46, 47 49, 47 52 L 27 52 C 23 52, 21 50, 21 46 Z" fill="url(#bagGrad)"/>
+  </g>
+
+  <!-- Right: Modern Typography 'ettadimart' -->
+  <g transform="translate(64, 46)">
+    <!-- 'ettadi' in clean slate-950 font -->
+    <text x="0" y="0" font-family="'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" font-size="30" font-weight="900" fill="#0F172A" letter-spacing="-0.5">
+      ettadi<tspan fill="#F37022" font-weight="800">mart</tspan>
+    </text>
+    
+    <!-- Posh micro tagline -->
+    <text x="2" y="16" font-family="'Plus Jakarta Sans', 'Inter', sans-serif" font-size="8.5" font-weight="700" fill="#64748B" letter-spacing="1.5">
+      CHINA IMPORTED VARIETIES
+    </text>
+  </g>
+</svg>

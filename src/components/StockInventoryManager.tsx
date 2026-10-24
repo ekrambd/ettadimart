@@ -71,28 +71,14 @@ export default function StockInventoryManager() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      let list = await dbService.getProducts();
-
-      const isInitialized = localStorage.getItem('stock_catalog_initialized');
-
-      // Seed default stock catalog ONLY on initial clean start
-      if ((!list || list.length === 0) && !isInitialized) {
-        list = await seedDefaultStockProducts();
-        localStorage.setItem('stock_catalog_initialized', 'true');
-      } else if (list && list.length > 0) {
-        localStorage.setItem('stock_catalog_initialized', 'true');
-      }
-
-      setProducts(list);
+      const list = await dbService.getProducts();
+      setProducts(list || []);
     } catch (e) {
       console.error('Failed to load products for inventory:', e);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const seedDefaultStockProducts = async (): Promise<Product[]> => {
-    return [];
   };
 
   // Helper calculation for dynamic product numbers

@@ -27,12 +27,12 @@ const BRAND_COLOR_PRESETS = [
 
 export default function ProfileSettings({ adminEmail }: ProfileSettingsProps) {
   // Store Details state
-  const [storeName, setStoreName] = useState('SHOSTIR BAZAR');
-  const [companyName, setCompanyName] = useState('SHOSTIR BAZAR');
-  const [storeTagline, setStoreTagline] = useState('COMFORT TO WELLNESS');
-  const [topAnnouncementText, setTopAnnouncementText] = useState('WELCOME TO SHOSTIR BAZAR');
-  const [phone, setPhone] = useState('+8801329458568');
-  const [email, setEmail] = useState('support@shostirbazar.com');
+  const [storeName, setStoreName] = useState('ETTADI MART');
+  const [companyName, setCompanyName] = useState('Ettadi Mart');
+  const [storeTagline, setStoreTagline] = useState('China Imported Varieties & Smart Lifestyle Products');
+  const [topAnnouncementText, setTopAnnouncementText] = useState('🔥 চায়না থেকে সরাসরি আমদানিকৃত সেরা ট্রেন্ডি গ্যাজেটস ও ভ্যারাইটিজ সমগ্র | সারা দেশে ক্যাশ অন ডেলিভারি!');
+  const [phone, setPhone] = useState('01726275850');
+  const [email, setEmail] = useState('support@ettadimart.com');
   const [street, setStreet] = useState('Dhaka, Bangladesh');
   const [industry, setIndustry] = useState('General E-Commerce');
 
@@ -512,7 +512,7 @@ export default function ProfileSettings({ adminEmail }: ProfileSettingsProps) {
                       value={storeName}
                       onChange={(e) => setStoreName(e.target.value)}
                       className="block w-full pl-10 pr-4 py-3 bg-transparent text-sm text-slate-900 focus:outline-none font-semibold"
-                      placeholder="e.g. SHOSTIR BAZAR"
+                      placeholder="e.g. ETTADI MART"
                     />
                   </div>
                 </div>

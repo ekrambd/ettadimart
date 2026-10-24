@@ -1,11 +1,11 @@
 {
-  "name": "zinniamart",
+  "name": "ettadimart",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "dev:cluster": "tsx src/server/clusterServer.ts",
+    "dev": "tsx watch server.ts",
+    "dev:cluster": "tsx watch src/server/clusterServer.ts",
     "start:cluster": "node dist/clusterServer.cjs",
     "backup:create": "node --import tsx scripts/disasterRecovery.ts create",
     "backup:list": "node --import tsx scripts/disasterRecovery.ts list",

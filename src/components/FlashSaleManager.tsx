@@ -97,7 +97,7 @@ export default function FlashSaleManager({ products, onSettingsUpdated }: FlashS
       ...prev,
       title: selectedProduct.title,
       subtitle: selectedProduct.description ? selectedProduct.description.slice(0, 160) + '...' : prev.subtitle,
-      customImage: selectedProduct.coverImage || selectedProduct.images?.[0] || prev.customImage,
+      customImage: selectedProduct.coverImage || selectedProduct.image || (selectedProduct as any).images?.[0] || prev.customImage,
       originalPrice: selectedProduct.regularPrice || selectedProduct.price,
       flashPrice: selectedProduct.regularPrice ? selectedProduct.price : Math.round(selectedProduct.price * 0.8),
       badgeTag: selectedProduct.category ? `${selectedProduct.category.toUpperCase()} FLASH DEAL` : 'LIMITED FLASH SALE'

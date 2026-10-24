@@ -5,7 +5,7 @@ import { cacheResponse } from '../middleware/cacheMiddleware';
 
 export const instituteRouter = Router();
 
-instituteRouter.get('/', cacheResponse({ ttlSeconds: 300, staleWhileRevalidateSeconds: 600, tag: 'institute' }), async (req, res) => {
+instituteRouter.get('/', async (req, res) => {
   const item = await prisma.instituteInfo.findUnique({ where: { id: 'global' } });
   res.json(item || {});
 });

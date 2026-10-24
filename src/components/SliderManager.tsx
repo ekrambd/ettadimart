@@ -1000,7 +1000,7 @@ export default function SliderManager() {
                       <option value="">-- Select Product --</option>
                       {products.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.title} (Tk.{p.offerPrice || p.regularPrice})
+                          {p.title} (Tk.{(p as any).offerPrice || p.price || p.regularPrice})
                         </option>
                       ))}
                     </select>

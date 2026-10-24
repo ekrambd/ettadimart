@@ -21,12 +21,29 @@ export function truncateSeoText(value: string, maxLength: number): string {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-export function updateMetaTags(title: string, description: string, image?: string, url?: string) {
+export function updateMetaTags(
+  title: string, 
+  description: string, 
+  image?: string, 
+  url?: string, 
+  keywords?: string
+) {
   if (typeof document === 'undefined') return;
   
   document.title = title;
+
+  // Update Keywords
+  if (keywords) {
+    let metaKeywords = document.querySelector('meta[name="keywords"]');
+    if (!metaKeywords) {
+      metaKeywords = document.createElement('meta');
+      metaKeywords.setAttribute('name', 'keywords');
+      document.head.appendChild(metaKeywords);
+    }
+    metaKeywords.setAttribute('content', keywords);
+  }
   
-  // Update OG Title
+  // Update OG Title & Twitter Title
   let ogTitle = document.querySelector('meta[property="og:title"]');
   if (!ogTitle) {
     ogTitle = document.createElement('meta');
@@ -35,7 +52,15 @@ export function updateMetaTags(title: string, description: string, image?: strin
   }
   ogTitle.setAttribute('content', title);
 
-  // Update Description
+  let twTitle = document.querySelector('meta[name="twitter:title"]');
+  if (!twTitle) {
+    twTitle = document.createElement('meta');
+    twTitle.setAttribute('name', 'twitter:title');
+    document.head.appendChild(twTitle);
+  }
+  twTitle.setAttribute('content', title);
+
+  // Update Description & Twitter Description
   let metaDesc = document.querySelector('meta[name="description"]');
   if (!metaDesc) {
     metaDesc = document.createElement('meta');
@@ -52,7 +77,15 @@ export function updateMetaTags(title: string, description: string, image?: strin
   }
   ogDesc.setAttribute('content', description);
 
-  // Update OG Image
+  let twDesc = document.querySelector('meta[name="twitter:description"]');
+  if (!twDesc) {
+    twDesc = document.createElement('meta');
+    twDesc.setAttribute('name', 'twitter:description');
+    document.head.appendChild(twDesc);
+  }
+  twDesc.setAttribute('content', description);
+
+  // Update OG Image & Twitter Image
   if (image) {
     let ogImage = document.querySelector('meta[property="og:image"]');
     if (!ogImage) {
@@ -61,6 +94,14 @@ export function updateMetaTags(title: string, description: string, image?: strin
       document.head.appendChild(ogImage);
     }
     ogImage.setAttribute('content', image);
+
+    let twImage = document.querySelector('meta[name="twitter:image"]');
+    if (!twImage) {
+      twImage = document.createElement('meta');
+      twImage.setAttribute('name', 'twitter:image');
+      document.head.appendChild(twImage);
+    }
+    twImage.setAttribute('content', image);
   }
   
   // Update OG URL and Canonical Link
@@ -139,11 +180,11 @@ export function updateProductSchema(product: any, url: string, storeName: string
     "@context": "https://schema.org/",
     "@type": "Product",
     "name": product.title,
-    "image": images.length > 0 ? images : ['https://shostirbazar.com/placeholder-logo.svg'],
+    "image": images.length > 0 ? images : ['https://ettadimart.com/ettadimart-logo.svg'],
     "description": product.subtitle || product.description || `${product.title} from ${storeName}`,
     "sku": String(product.id),
     "mpn": String(product.id),
-    "category": product.series || product.category || 'Wellness & Organic Foods',
+    "category": product.series || product.category || 'China Imported Varieties & Smart Lifestyle',
     "brand": {
       "@type": "Brand",
       "name": product.brand || storeName

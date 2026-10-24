@@ -69,7 +69,7 @@ export function InvoicePreview({ order }: Props) {
   };
 
   const dt = formatDate(order.createdAt);
-  const storeName = ecomSettings?.storeName || instituteInfo?.name || 'SHOSTIR BAZAR';
+  const storeName = ecomSettings?.storeName || instituteInfo?.name || 'ETTADI MART';
   const storePhone = instituteInfo?.phone || ecomSettings?.supportPhone || '';
   const storeDomain = ecomSettings?.storeDomain 
     ? ecomSettings.storeDomain.replace(/^https?:\/\//i, '').replace(/\/$/, '')

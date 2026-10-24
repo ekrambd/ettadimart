@@ -91,7 +91,7 @@ export default function CategoryManager() {
   ) => {
     setLoading(true);
     try {
-      const compressed = await compressImage(file, { maxWidth: 600, maxHeight: 600, quality: 0.85, format: 'image/webp' });
+      const compressed = await compressImage(file, 600, 0.85);
       setImage(compressed);
     } catch (err) {
       console.error('Failed to compress image:', err);

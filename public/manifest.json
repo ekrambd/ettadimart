@@ -1,0 +1,38 @@
+{
+  "short_name": "EttadiMart",
+  "name": "ETTADI MART - ইত্যাদি মার্ট | China Imported Varieties",
+  "description": "চায়না থেকে সরাসরি আমদানিকৃত সেরা ট্রেন্ডি স্মার্ট গ্যাজেটস, হোম ও কিচেন ভ্যারাইটিজ সামগ্রী। সারা বাংলাদেশে ক্যাশ অন ডেলিভারি।",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ettadimart-favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "/?source=pwa",
+  "background_color": "#ffffff",
+  "theme_color": "#F37022",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "bn-BD",
+  "categories": ["shopping", "lifestyle", "gadgets"]
+}

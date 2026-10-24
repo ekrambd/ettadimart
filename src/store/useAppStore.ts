@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { Product, ProductVariant, CartItem } from '../types';
+import { Product, ProductVariant, CartItem, EcomSettings, InstituteInfo } from '../types';
 
 interface AppState {
   // Admin Auth State
@@ -9,6 +9,12 @@ interface AppState {
   setAdminEmail: (email: string | null) => void;
   logoutAdmin: () => void;
   
+  // Settings & Store Profile State
+  ecomSettings?: EcomSettings | null;
+  instituteInfo?: InstituteInfo | null;
+  setEcomSettings: (settings: EcomSettings | null) => void;
+  setInstituteInfo: (info: InstituteInfo | null) => void;
+
   // Ecom Cart State
   cart: CartItem[];
   addToCart: (item: CartItem) => void;
@@ -24,6 +30,11 @@ export const useAppStore = create<AppState>()(
       setAdminEmail: (email) => set({ adminEmail: email }),
       logoutAdmin: () => set({ adminEmail: null }),
       
+      ecomSettings: null,
+      instituteInfo: null,
+      setEcomSettings: (ecomSettings) => set({ ecomSettings }),
+      setInstituteInfo: (instituteInfo) => set({ instituteInfo }),
+
       cart: [],
       addToCart: (item) =>
         set((state) => {
@@ -52,7 +63,7 @@ export const useAppStore = create<AppState>()(
       clearCart: () => set({ cart: [] }),
     }),
     {
-      name: 'zinniamart-storage',
+      name: 'ettadimart-storage',
     }
   )
 );

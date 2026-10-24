@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520" width="520" height="520">
+  <defs>
+    <linearGradient id="sqBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="btnAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDD305"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="softGlowSquare" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="40" result="blur"/>
+    </filter>
+  </defs>
+
+  <!-- Square Card Base -->
+  <rect width="520" height="520" rx="20" fill="url(#sqBg)"/>
+
+  <!-- Ambient Light -->
+  <circle cx="260" cy="220" r="160" fill="#f59e0b" opacity="0.2" filter="url(#softGlowSquare)"/>
+
+  <!-- Top Offer Badge -->
+  <g transform="translate(35, 35)">
+    <rect x="0" y="0" width="150" height="32" rx="6" fill="url(#fireGrad)"/>
+    <text x="14" y="21" font-family="'Plus Jakarta Sans', sans-serif" font-size="12" font-weight="900" fill="#ffffff" letter-spacing="1">
+      SPECIAL OFFER
+    </text>
+  </g>
+
+  <!-- Headline -->
+  <g transform="translate(35, 100)">
+    <text x="0" y="0" font-family="'Hind Siliguri', 'Noto Sans Bengali', sans-serif" font-size="28" font-weight="800" fill="#ffffff">
+      স্মার্ট কিচেন ও ডেইলি
+    </text>
+    <text x="0" y="42" font-family="'Hind Siliguri', 'Noto Sans Bengali', sans-serif" font-size="34" font-weight="900" fill="#FDD305">
+      ভ্যারাইটিজ গ্যাজেটস
+    </text>
+    <text x="0" y="74" font-family="'Plus Jakarta Sans', sans-serif" font-size="14" font-weight="600" fill="#94a3b8">
+      Trendy Kitchen Tools • Home Essentials
+    </text>
+  </g>
+
+  <!-- Product Illustration Card in Middle -->
+  <g transform="translate(60, 205)">
+    <!-- Container Card -->
+    <rect x="0" y="0" width="400" height="190" rx="16" fill="#1e293b" fill-opacity="0.9" stroke="#334155" stroke-width="1.5"/>
+
+    <!-- 3 Mini Product Showcase Highlights -->
+    <g transform="translate(25, 25)">
+      <!-- Chopper -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="105" height="100" rx="12" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <circle cx="52" cy="40" r="24" fill="#10b981" opacity="0.8"/>
+        <!-- Chopper blade -->
+        <path d="M42 40 L62 40 M52 30 L52 50" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+        <text x="16" y="82" font-family="'Hind Siliguri', sans-serif" font-size="11" font-weight="700" fill="#e2e8f0">মিনি চপার</text>
+        <text x="24" y="94" font-family="'Plus Jakarta Sans', sans-serif" font-size="9" font-weight="800" fill="#FDD305">৳৪৯০</text>
+      </g>
+
+      <!-- Sealer -->
+      <g transform="translate(122, 0)">
+        <rect x="0" y="0" width="105" height="100" rx="12" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <rect x="22" y="25" width="60" height="30" rx="8" fill="#f59e0b" opacity="0.85"/>
+        <circle cx="70" cy="40" r="4" fill="#ffffff"/>
+        <text x="14" y="82" font-family="'Hind Siliguri', sans-serif" font-size="11" font-weight="700" fill="#e2e8f0">প্লাস্টিক সিলার</text>
+        <text x="24" y="94" font-family="'Plus Jakarta Sans', sans-serif" font-size="9" font-weight="800" fill="#FDD305">৳৩৯০</text>
+      </g>
+
+      <!-- Trimmer -->
+      <g transform="translate(244, 0)">
+        <rect x="0" y="0" width="105" height="100" rx="12" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <rect x="38" y="16" width="30" height="50" rx="6" fill="#eab308" opacity="0.9"/>
+        <rect x="42" y="10" width="22" height="10" rx="2" fill="#94a3b8"/>
+        <text x="20" y="82" font-family="'Hind Siliguri', sans-serif" font-size="11" font-weight="700" fill="#e2e8f0">টি৯ ট্রিমার</text>
+        <text x="24" y="94" font-family="'Plus Jakarta Sans', sans-serif" font-size="9" font-weight="800" fill="#FDD305">৳৬৫০</text>
+      </g>
+    </g>
+
+    <!-- Hot Deal Tag -->
+    <text x="25" y="160" font-family="'Hind Siliguri', sans-serif" font-size="12" font-weight="700" fill="#38bdf8">
+      ✓ আনবক্সিং চেক করে মূল্য পরিশোধের সুবিধা
+    </text>
+  </g>
+
+  <!-- Bottom CTA Row -->
+  <g transform="translate(35, 425)">
+    <rect x="0" y="0" width="450" height="55" rx="12" fill="url(#btnAmber)"/>
+    <text x="140" y="34" font-family="'Hind Siliguri', 'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="900" fill="#0f172a">
+      সকল কিচেন অফার দেখুন &rarr;
+    </text>
+  </g>
+</svg>

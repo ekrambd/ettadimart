@@ -59,7 +59,7 @@ backupEngine.startScheduledBackups(6);
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    service: 'Noor Digital Enterprise High-Availability E-Commerce Engine',
+    service: 'Ettadi Mart High-Availability E-Commerce Engine',
     workerPid: process.pid,
     uptimeSeconds: Math.round(process.uptime()),
     timestamp: new Date().toISOString()
@@ -155,10 +155,10 @@ app.post('/api/notifications/send', async (req, res) => {
     res.status(400).json({ success: false, message: 'title, body, and non-empty tokens array are required' });
     return;
   }
-
   try {
-    const { storeSettings } = await import('./data/store');
-    const serverKey = storeSettings.fcmServerKey || process.env.FCM_SERVER_KEY;
+    const { getDbSettings } = await import('./routes/settingsRoutes');
+    const storeSettings = await getDbSettings();
+    const serverKey = storeSettings?.fcmServerKey || process.env.FCM_SERVER_KEY;
 
     if (!serverKey) {
       res.status(400).json({ 

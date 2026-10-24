@@ -6,7 +6,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 export const categoryRouter = Router();
 
 // GET all categories
-categoryRouter.get('/', cacheResponse({ ttlSeconds: 60, staleWhileRevalidateSeconds: 120, tag: 'categories' }), async (req, res) => {
+categoryRouter.get('/', async (req, res) => {
   try {
     const items = await prisma.category.findMany();
     res.json(items);

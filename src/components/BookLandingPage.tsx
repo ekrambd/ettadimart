@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   ShoppingCart, RefreshCw, Zap, 
-  CheckCircle2, Clock, ChevronLeft, ChevronRight, Check,
-  MessageCircle, Settings, Trophy, Wrench, Shirt, ShieldCheck, Package, Copy
+  CheckCircle2, ChevronLeft, ChevronRight, Check,
+  MessageCircle, Trophy, ShieldCheck, Package, Copy
 } from 'lucide-react';
-import { publicStoreService, readStorefrontCache, optimizeImageUrl } from '../lib/publicStoreService';
+import { publicStoreService, optimizeImageUrl } from '../lib/publicStoreService';
 import { DEFAULT_DELIVERY_METHODS, DEFAULT_LANDING_PAGE_SETTINGS, createDefaultLandingForProduct } from '../lib/constants';
 import { Product, EcomSettings, BookOrder, LandingPageData, DeliveryMethodItem, LandingPageVariant, InstituteInfo } from '../types';
 import { initPixelAndGtm, trackEvent, createEventId } from '../lib/pixelGtmService';
@@ -23,69 +23,18 @@ interface BookLandingPageProps {
 export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps) {
   const { slug } = useParams<{ slug?: string }>();
   
-  // Instant Cache Hydration: Render in 0ms without waiting for network/Firestore
-  const [storeSettings, setStoreSettings] = useState<EcomSettings | null>(() => readStorefrontCache<EcomSettings>('noor_ecom_settings'));
-  const [instituteInfo, setInstituteInfo] = useState<InstituteInfo | null>(() => readStorefrontCache<InstituteInfo>('noor_institute_info'));
-  const [allProducts, setAllProducts] = useState<Product[]>(() => readStorefrontCache<Product[]>('noor_ecom_products') || []);
+  // Dynamic Live State from DB API - No local cache, no seed data
+  const [storeSettings, setStoreSettings] = useState<EcomSettings | null>(null);
+  const [instituteInfo, setInstituteInfo] = useState<InstituteInfo | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [landingConfig, setLandingConfig] = useState<LandingPageData | null>(null);
   
-  const initialTargetProduct = useMemo(() => {
-    const cachedProds = readStorefrontCache<Product[]>('noor_ecom_products') || [];
-    let decodedSlug = '';
-    try {
-      decodedSlug = slug ? decodeURIComponent(slug).trim().toLowerCase() : '';
-    } catch {
-      decodedSlug = slug ? slug.trim().toLowerCase() : '';
-    }
-    const rawSlug = slug ? slug.trim().toLowerCase() : '';
-
-    if ((decodedSlug || rawSlug) && cachedProds.length > 0) {
-      return cachedProds.find(p => {
-        const pSlug = (p.slug || '').toLowerCase();
-        const genSlug = getProductSlug(p).toLowerCase();
-        const pId = p.id.toLowerCase();
-        const pTitle = (p.title || '').toLowerCase();
-        return pId === decodedSlug || pId === rawSlug ||
-               pSlug === decodedSlug || pSlug === rawSlug ||
-               genSlug === decodedSlug || genSlug === rawSlug ||
-               pTitle === decodedSlug;
-      }) || cachedProds[0];
-    }
-    return cachedProds[0] || null;
-  }, [slug]);
-
-  const [product, setProduct] = useState<Product | null>(initialTargetProduct);
-  const [landingConfig, setLandingConfig] = useState<LandingPageData | null>(() => {
-    const key = `noor_lp_${slug || initialTargetProduct?.slug || initialTargetProduct?.id || 'default'}`;
-    const cached = readStorefrontCache<LandingPageData>(key);
-    if (cached) return cached;
-    if (initialTargetProduct) {
-      return createDefaultLandingForProduct(initialTargetProduct);
-    }
-    return DEFAULT_LANDING_PAGE_SETTINGS;
-  });
-  
-  // Never block the user with full-page loading if cache or defaults are present
   const [loading, setLoading] = useState(false);
 
   // Gallery slider & Variant state
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<LandingPageVariant | null>(() => {
-    const key = `noor_lp_${slug || initialTargetProduct?.slug || initialTargetProduct?.id || 'default'}`;
-    const cachedLp = readStorefrontCache<LandingPageData>(key);
-    if (cachedLp?.customVariants && cachedLp.customVariants.length > 0) {
-      return cachedLp.customVariants[0];
-    }
-    if (initialTargetProduct?.variants && initialTargetProduct.variants.length > 0) {
-      return {
-        id: initialTargetProduct.variants[0].id || 'var-0',
-        name: initialTargetProduct.variants[0].name,
-        image: optimizeImageUrl(initialTargetProduct.variants[0].image || initialTargetProduct.samplePages?.[0] || initialTargetProduct.image || '', 400),
-        price: initialTargetProduct.variants[0].price || initialTargetProduct.price,
-        regularPrice: initialTargetProduct.variants[0].regularPrice || initialTargetProduct.regularPrice
-      };
-    }
-    return null;
-  });
+  const [selectedVariant, setSelectedVariant] = useState<LandingPageVariant | null>(null);
 
   // Form states
   const [customerName, setCustomerName] = useState('');
@@ -135,7 +84,7 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
           publicStoreService.getEcomSettings(),
           publicStoreService.getProducts(),
           publicStoreService.getInstituteInfo(),
-          publicStoreService.getLandingPageSettings(decodedSlug || rawSlug, initialTargetProduct || undefined)
+          publicStoreService.getLandingPageSettings(decodedSlug || rawSlug)
         ]);
 
         if (isCancelled) return;
@@ -179,7 +128,7 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
         }
 
         // Initialize variant if available
-        if (lpSettings.customVariants && lpSettings.customVariants.length > 0) {
+        if (lpSettings && lpSettings.customVariants && lpSettings.customVariants.length > 0) {
           setSelectedVariant(prev => prev || lpSettings.customVariants![0]);
         } else if (targetProduct?.variants && targetProduct.variants.length > 0) {
           const firstVar: LandingPageVariant = {
@@ -237,15 +186,15 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
     return () => {
       isCancelled = true;
     };
-  }, [slug, initialTargetProduct]);
+  }, [slug]);
 
   const fallbackProduct = {
-    title: 'প্রিমিয়াম ন্যাচারাল ফুড প্রোডাক্ট',
-    subtitle: '১০০% খাঁটি ও স্বাস্থ্যকর পুষ্টিকর খাদ্য',
+    title: 'চায়না ট্রেন্ডি গ্যাজেটস ও ভ্যারাইটিজ প্রোডাক্ট',
+    subtitle: '১০০% অরিজিনাল ও প্রিমিয়াম কোয়ালিটি পণ্য',
     price: 0,
     regularPrice: 0,
     image: '/placeholder-image.svg',
-    description: '১০০% খাঁটি ও স্বাস্থ্যকর খাদ্যপণ্য। কোনো ক্ষতিকর কেমিক্যাল বা কৃত্রিম উপাদান ছাড়া প্রাকৃতিক উৎস থেকে সংগৃহীত।'
+    description: 'চায়না থেকে সরাসরি আমদানিকৃত সেরা ট্রেন্ডি স্মার্ট গ্যাজেটস ও কিচেন ভ্যারাইটিজ সমগ্র।'
   };
 
   const displayTitle = (landingConfig?.bookTitle && !landingConfig.bookTitle.includes('CASIO'))
@@ -271,9 +220,9 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
   };
   const embedVideoUrl = getYouTubeEmbedUrl(landingConfig?.videoUrl || product?.pdfUrl);
   
-  const campaignBadgeText = (landingConfig?.campaignBadgeText && !landingConfig.campaignBadgeText.includes('bike') && !landingConfig.campaignBadgeText.includes('R15'))
+  const campaignBadgeText = (landingConfig?.campaignBadgeText && !landingConfig.campaignBadgeText.includes('bike') && !landingConfig.campaignBadgeText.includes('R15') && !landingConfig.campaignBadgeText.includes('ফুড') && !landingConfig.campaignBadgeText.includes('খাঁটি'))
     ? landingConfig.campaignBadgeText
-    : '১০০% খাঁটি ও প্রিমিয়াম ফুড';
+    : (product?.category ? `১০০% অরিজিনাল ${product.category}` : '১০০% অরিজিনাল ও প্রিমিয়াম কোয়ালিটি');
   const rawTicker = landingConfig?.campaignTickerText || landingConfig?.bannerDeliveryText;
   const campaignTickerText = (rawTicker && !rawTicker.includes('bike') && !rawTicker.includes('R15') && !rawTicker.includes('car'))
     ? rawTicker
@@ -356,7 +305,7 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
     return list.length > 0 ? list : [displayImage];
   }, [product?.coverImage, product?.image, product?.samplePages, product?.additionalImages, landingConfig?.galleryImages, variants, displayImage]);
 
-  const storeName = storeSettings?.storeName || instituteInfo?.name || 'SHOSTIR BAZAR';
+  const storeName = storeSettings?.storeName || instituteInfo?.name || 'ETTADI MART';
 
   // Support & Helpline Phone
   const rawSupportPhone = instituteInfo?.phone || storeSettings?.bkashNumber || storeSettings?.nagadNumber || landingConfig?.whatsAppNumber || '';
@@ -371,50 +320,11 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
     : '';
   const cleanWhatsAppNumber = whatsAppPhone.replace(/\D/g, '').replace(/^0/, '880');
 
-  // Dynamic Vintage / Story Section Data
-  const vintageTag = (landingConfig?.vintageTag && !landingConfig.vintageTag.includes('vintage')) ? landingConfig.vintageTag : 'খাঁটি ও প্রাকৃতিক খাদ্য';
-  const vintageTitle = (landingConfig?.vintageTitle && !landingConfig.vintageTitle.includes('clocks')) ? landingConfig.vintageTitle : 'সুস্থতা ও দীর্ঘস্থায়ী শক্তির প্রাকৃতিক সমাধান';
-  const vintageDescription = (landingConfig?.vintageDescription && !landingConfig.vintageDescription.includes('স্মার্টওয়াচের')) ? landingConfig.vintageDescription : (product?.shortSummary || 'স্বাস্থ্যকর জীবনযাপনের জন্য খাঁটি ও বিশুদ্ধ প্রাকৃতিক পুষ্টি উপাদান। যা আপনার প্রতিদিনের শক্তিবর্ধনে সহায়ক।');
-
-  const vintageFeatures = useMemo(() => {
-    if (product?.features && product.features.length > 0) {
-      return product.features.map((f, i) => ({
-        id: `pf-${i}`,
-        title: f,
-        subtitle: '১০০% অরিজিনাল ও পরীক্ষিত',
-        icon: i % 2 === 0 ? 'ShieldCheck' : 'Zap'
-      }));
-    }
-    if (landingConfig?.vintageFeatures && landingConfig.vintageFeatures.length > 0 && !landingConfig.vintageFeatures[0].title.includes('Classic Dial')) {
-      return landingConfig.vintageFeatures;
-    }
-    return [
-      { id: 'vf-1', title: '১০০% খাঁটি ও ফ্রেশ', subtitle: 'বিশ্বস্ত উৎস থেকে সরাসরি সংগৃহীত', icon: 'ShieldCheck' },
-      { id: 'vf-2', title: 'পুষ্টিগুণে ভরপুর', subtitle: 'প্রাকৃতিক ভিটামিন ও মিনারেলে সমৃদ্ধ', icon: 'Zap' },
-      { id: 'vf-3', title: 'হাইজিনিক ফুড-গ্রেড প্যাকেজিং', subtitle: 'বাতাস ও আর্দ্রতারোধক সিলড প্যাকেটে সুরক্ষিত', icon: 'Package' },
-      { id: 'vf-4', title: 'ক্যাশ অন ডেলিভারি', subtitle: 'পণ্য হাতে পেয়ে দেখে নিশ্চিত হয়ে মূল্য পরিশোধ', icon: 'Clock' }
-    ];
-  }, [product?.features, landingConfig?.vintageFeatures]);
-
   // Gallery Section Titles
   const gallerySectionTag = landingConfig?.gallerySectionTag ?? 'গ্যালারি';
   const gallerySectionTitle = landingConfig?.gallerySectionTitle ?? 'প্রোডাক্টের প্রতিটি অ্যাঙ্গেলের আসল ছবি';
 
-  // Quality Section Data
-  const qualitySectionTag = (landingConfig?.qualitySectionTag && !landingConfig.qualitySectionTag.includes('watch')) ? landingConfig.qualitySectionTag : 'কেন আমাদের পণ্য সেরা?';
-  const qualitySectionTitle = (landingConfig?.qualitySectionTitle && !landingConfig.qualitySectionTitle.includes('Japanese')) ? landingConfig.qualitySectionTitle : 'সেরা মান, শতভাগ বিশুদ্ধতা ও সাশ্রয়ী মূল্য';
-
-  const qualityItems = useMemo(() => {
-    if (landingConfig?.qualityItems && landingConfig.qualityItems.length > 0) {
-      return landingConfig.qualityItems;
-    }
-    return [
-      { id: 'qi-1', title: 'ল্যাব টেস্টেড বিশুদ্ধতা', subtitle: 'কোনো প্রকার ভেজাল বা ক্যামিকেল মুক্ত', icon: 'ShieldCheck' },
-      { id: 'qi-2', title: 'সরাসরি সংগ্রহ', subtitle: 'উৎপাদকদের থেকে সরাসরি বিশ্বস্ত সোর্সিং', icon: 'Trophy' }
-    ];
-  }, [landingConfig?.qualityItems]);
-
-  // Lucky Draw Campaign Data / Ordering Guide
+  // Order Guide / Steps
   const luckyDrawTag = (landingConfig?.luckyDrawTag && !landingConfig.luckyDrawTag.includes('R15')) ? landingConfig.luckyDrawTag : 'সহজ অর্ডার প্রক্রিয়া';
   const luckyDrawTitle = (landingConfig?.luckyDrawTitle && !landingConfig.luckyDrawTitle.includes('R15')) ? landingConfig.luckyDrawTitle : 'সহজ ৪ ধাপে অর্ডার নির্দেশিকা';
   const luckyDrawSteps = useMemo(() => {
@@ -429,29 +339,9 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
     ];
   }, [landingConfig?.luckyDrawSteps]);
 
-  const grandPrizeTitle = landingConfig?.grandPrizeTitle ?? 'SHOSTIR BAZAR';
-  const grandPrizeSubtitle = landingConfig?.grandPrizeSubtitle ?? 'Comfort To Wellness';
-  const grandPrizeLiveTag = landingConfig?.grandPrizeLiveTag ?? '১০০% অরিজিনাল গ্যারান্টি';
-
-  // Color Section Titles
+  // Color / Package Section Titles
   const colorSectionTag = landingConfig?.colorSectionTag ?? 'প্যাকেজ নির্বাচন';
   const colorSectionTitle = landingConfig?.colorSectionTitle ?? 'আপনার পছন্দের প্যাকেজ সিলেক্ট করে অর্ডার করুন';
-
-  // Icon Helper for Dynamic Cards
-  const renderFeatureIcon = (iconName?: string) => {
-    switch ((iconName || '').toLowerCase()) {
-      case 'shieldcheck': return <ShieldCheck className="w-5 h-5 text-emerald-400" />;
-      case 'package': return <Package className="w-5 h-5 text-[#e0562e]" />;
-      case 'wrench': return <Wrench className="w-5 h-5 text-[#e0562e]" />;
-      case 'zap': return <Zap className="w-5 h-5 text-amber-400" />;
-      case 'shirt': return <Shirt className="w-5 h-5 text-[#e0562e]" />;
-      case 'settings': return <Settings className="w-5 h-5 text-[#8f8274]" />;
-      case 'trophy': return <Trophy className="w-5 h-5 text-[#d49b38]" />;
-      case 'clock':
-      default:
-        return <Clock className="w-5 h-5 text-[#e0562e]" />;
-    }
-  };
 
   const discountPercent = regularPrice > displayPrice 
     ? Math.round(((regularPrice - displayPrice) / regularPrice) * 100) 
@@ -533,7 +423,7 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
   const scrollToOrder = () => {
     const eventId = createEventId('initiate_checkout');
     trackEvent('InitiateCheckout', {
-      content_name: chosenItemTitle,
+      content_name: displayTitle || product?.title || 'Product',
       content_ids: [product?.id || landingConfig?.productId || 'landing_product'],
       content_type: 'product',
       value: totalPrice || displayPrice,
@@ -812,46 +702,7 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
         </section>
 
         {/* ========================================================== */}
-        {/* 2. SECTION: 'Whose eyes still get stuck on the clocks of yesteryear' */}
-        {/* ========================================================== */}
-        <section className="text-center space-y-4 pt-4">
-          <div className="space-y-1">
-            {vintageTag && (
-              <p className="text-xs sm:text-sm font-bold text-[#e0562e] tracking-wide">
-                {vintageTag}
-              </p>
-            )}
-            <h2 className="text-lg sm:text-2xl font-black text-white px-2">
-              {vintageTitle}
-            </h2>
-            {vintageDescription && (
-              <p className="text-xs text-[#b8aba0] max-w-md mx-auto leading-relaxed pt-1">
-                {vintageDescription}
-              </p>
-            )}
-          </div>
-
-          {/* Dynamic Feature Cards with Dashed Amber Border */}
-          <div className="space-y-3 pt-1 text-left">
-            {vintageFeatures.map((feat, idx) => (
-              <div 
-                key={feat.id || idx}
-                className="bg-[#17130e] border border-dashed border-[#b8863b]/70 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3.5 shadow-sm"
-              >
-                <div className="w-10 h-10 rounded-xl bg-[#251d14] border border-[#b8863b]/30 flex items-center justify-center text-[#e0562e] shrink-0">
-                  {renderFeatureIcon(feat.icon)}
-                </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-[#e0562e]">{feat.title}</h3>
-                  <p className="text-[11px] sm:text-xs text-[#c9bcb0]">{feat.subtitle}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ========================================================== */}
-        {/* 3. SECTION: 'Gallery' / 'Premium from every angle' */}
+        {/* 2. SECTION: 'Gallery' / 'Premium from every angle' */}
         {/* ========================================================== */}
         <section className="text-center space-y-3 pt-3">
           <div className="space-y-1">

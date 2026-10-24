@@ -83,6 +83,8 @@ export interface Product {
   isUnlisted?: boolean;
   codAvailable?: boolean;
   deliveryChargeEnabled?: boolean;
+  freeDelivery?: boolean;
+  isFreeDelivery?: boolean;
   deliveryChargeAmount?: number;
   exclusiveDelivery?: boolean;
   addQrToImage?: boolean;
@@ -114,6 +116,7 @@ export interface HeroBannerItem {
   mobileImageUrl?: string;
 
   link?: string;
+  linkUrl?: string;
   actionType?: 'product' | 'external';
   productId?: string;
   mediaType?: 'image' | 'video';
@@ -374,8 +377,13 @@ export interface EcomSettings {
   metaApiToken?: string;
   steadfastApiKey?: string;
   steadfastSecretKey?: string;
-  deliveryChargeInsideDhaka: number;
-  deliveryChargeOutsideDhaka: number;
+  storeDomain?: string;
+  supportPhone?: string;
+  supportEmail?: string;
+  freeDeliveryActive?: boolean;
+  freeDeliveryMinAmount?: number;
+  deliveryChargeInsideDhaka?: number;
+  deliveryChargeOutsideDhaka?: number;
   deliveryChargeInsideExpress?: number;
   deliveryChargeOutsideExpress?: number;
   freeDeliveryEnabled?: boolean;
@@ -444,6 +452,7 @@ export interface AboutPageStat {
 export interface AboutPageSettings {
   title?: string;
   subtitle?: string;
+  description?: string;
   content?: string;
   image?: string;
   badge?: string;
@@ -527,6 +536,7 @@ export interface BookOrder {
   productId?: string;
   productName?: string;
   customerName: string;
+  customerPhone?: string;
   email?: string; 
   couponDiscount?: number;
 
@@ -547,7 +557,7 @@ export interface BookOrder {
   items?: CartItem[] | any[];
   totalPrice?: number; // 580
   totalAmount?: number;
-  paymentMethod?: 'COD' | 'bKash' | 'Nagad';
+  paymentMethod?: 'COD' | 'bKash' | 'Nagad' | string;
   trxId?: string;
   senderPhone?: string;
   orderType?: 'landing' | 'physical' | 'store' | 'storefront';

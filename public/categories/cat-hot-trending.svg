@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="16" fill="#f8fafc"/>
+  <circle cx="100" cy="85" r="50" fill="#ef4444" opacity="0.12"/>
+  <!-- Fire / Flame icon for trending -->
+  <path d="M100 45 C115 65 125 78 125 95 C125 112 114 125 100 125 C86 125 75 112 75 95 C75 80 88 65 100 45 Z" fill="#ef4444"/>
+  <path d="M100 70 C108 82 114 90 114 100 C114 110 108 118 100 118 C92 118 86 110 86 100 C86 90 92 82 100 70 Z" fill="#f59e0b"/>
+  <text x="100" y="160" font-family="'Hind Siliguri', 'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="700" fill="#0f172a" text-anchor="middle">হট ট্রেন্ডিং</text>
+  <text x="100" y="180" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="600" fill="#64748b" text-anchor="middle">Hot Trending</text>
+</svg>

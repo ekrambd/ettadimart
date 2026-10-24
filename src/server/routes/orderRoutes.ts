@@ -1,50 +1,62 @@
 import { Router } from 'express';
-import { checkoutRateLimiter } from '../middleware/rateLimiter';
-import { storeOrders, storeProducts, storeSettings, saveOrdersToDisk } from '../data/store';
-import { BookOrder } from '../../types';
-import { cacheResponse } from '../middleware/cacheMiddleware';
-import { requireAdmin } from '../middleware/adminAuth';
-import { globalCache } from '../services/cacheEngine';
-import { shardService } from '../services/shardService';
-import { redundancyService } from '../services/redundancyService';
 import { prisma } from '../db';
+import { BookOrder } from '../../types';
+import { requireAdmin } from '../middleware/adminAuth';
 import { validateBDPhone, validateDeliveryAddress } from '../../lib/validationUtils';
+import { getDbSettings } from './settingsRoutes';
 
 export const orderRouter = Router();
 
-// Live SSE Clients for instantaneous real-time order stream
-const liveClients = new Set<(order: BookOrder) => void>();
+// Rate limiter for checkout
+const checkoutAttempts = new Map<string, { count: number; firstAttempt: number }>();
+function checkoutRateLimiter(req: any, res: any, next: any) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxAttempts = 15;
 
-export function broadcastNewOrder(order: BookOrder) {
-  liveClients.forEach(callback => {
-    try {
-      callback(order);
-    } catch {
-      liveClients.delete(callback);
-    }
-  });
+  const userRecord = checkoutAttempts.get(ip);
+  if (!userRecord || now - userRecord.firstAttempt > windowMs) {
+    checkoutAttempts.set(ip, { count: 1, firstAttempt: now });
+    return next();
+  }
+
+  if (userRecord.count >= maxAttempts) {
+    return res.status(429).json({ error: 'Too many order attempts. Please wait a minute and try again.' });
+  }
+
+  userRecord.count++;
+  next();
 }
 
-// GET /api/orders/live - Server-Sent Events (SSE) for Real-Time Order Stream
-orderRouter.get('/live', (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no'
-  });
-  res.write('\n');
-
-  const onNewOrder = (order: BookOrder) => {
+// Live SSE Order Clients
+const liveClients = new Set<(order: any) => void>();
+function broadcastNewOrder(order: any) {
+  for (const client of liveClients) {
     try {
-      res.write(`data: ${JSON.stringify({ type: 'NEW_ORDER', order })}\n\n`);
+      client(order);
+    } catch {
+      liveClients.delete(client);
+    }
+  }
+}
+
+// GET /api/orders/live - SSE Stream
+orderRouter.get('/live', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const onNewOrder = (order: any) => {
+    try {
+      res.write(`data: ${JSON.stringify(order)}\n\n`);
     } catch {
       liveClients.delete(onNewOrder);
     }
   };
 
   liveClients.add(onNewOrder);
-
   const heartbeat = setInterval(() => {
     try {
       res.write(': keepalive\n\n');
@@ -60,77 +72,98 @@ orderRouter.get('/live', (req, res) => {
   });
 });
 
-// GET All Orders - Live in-memory fetch with Zero latency (Never stale)
+function formatOrder(o: any): BookOrder {
+  let items = o.items;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch { items = []; }
+  }
+
+  return {
+    id: o.id,
+    customerName: o.customerName,
+    name: o.customerName,
+    phone: o.phone,
+    address: o.address,
+    email: o.email || undefined,
+    couponCode: o.couponCode || undefined,
+    couponDiscount: o.couponDiscount ? Number(o.couponDiscount) : undefined,
+    paymentGateway: o.paymentGateway || undefined,
+    paymentMethod: o.paymentMethod || undefined,
+    deliveryFee: o.deliveryFee ? Number(o.deliveryFee) : undefined,
+    deliveryCharge: Number(o.deliveryCharge || 0),
+    deliveryZone: o.deliveryZone || undefined,
+    district: o.district || undefined,
+    thana: o.thana || undefined,
+    deliveryArea: o.deliveryArea || undefined,
+    productTitle: o.productTitle || undefined,
+    productName: o.productName || o.productTitle || undefined,
+    price: o.price ? Number(o.price) : undefined,
+    unitPrice: o.unitPrice ? Number(o.unitPrice) : undefined,
+    quantity: Number(o.quantity || 1),
+    items: Array.isArray(items) ? items : [],
+    totalPrice: o.totalPrice ? Number(o.totalPrice) : undefined,
+    totalAmount: o.totalAmount ? Number(o.totalAmount) : (o.totalPrice ? Number(o.totalPrice) : undefined),
+    trxId: o.trxId || undefined,
+    senderPhone: o.senderPhone || undefined,
+    orderType: o.orderType || 'storefront',
+    source: o.source || undefined,
+    status: o.status || 'Pending',
+    createdAt: o.createdAt ? new Date(o.createdAt).toISOString() : new Date().toISOString(),
+    orderDate: o.createdAt ? new Date(o.createdAt).toISOString() : new Date().toISOString()
+  };
+}
+
+// GET All Orders - Live from DB
 orderRouter.get('/', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
-  const includeCustomer = req.query.include === 'customer' || req.query.withCustomer === 'true';
-
-  let orders = [...storeOrders];
-
-  // Eager load customer data in 1 single batch query (Zero N+1 queries)
-  if (includeCustomer && orders.length > 0) {
-    const phones = Array.from(new Set(orders.map(o => o.phone).filter(Boolean)));
-    try {
-      const customers = await prisma.customer.findMany({
-        where: { phone: { in: phones } }
-      });
-      const customerMap = new Map(customers.map(c => [c.phone, c]));
-      orders = orders.map(o => ({
-        ...o,
-        customerDetails: o.phone ? (customerMap.get(o.phone) || null) : null
-      }));
-    } catch {}
+  try {
+    const orders = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(orders.map(formatOrder));
+  } catch (error) {
+    console.error('Failed to fetch orders from DB:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
   }
-
-  res.json(orders);
 });
 
-// GET /api/orders/track - Public 1-Click Order Tracking by Phone or Order ID (Free, Zero API cost)
-orderRouter.get('/track', (req, res) => {
+// GET /api/orders/track - Order Tracking by Phone or ID
+orderRouter.get('/track', async (req, res) => {
   const query = String(req.query.q || req.query.phone || req.query.id || '').trim();
   if (!query) {
     return res.status(400).json({ success: false, message: 'Please provide a phone number or Order ID' });
   }
 
   const cleanDigits = query.replace(/\D/g, '');
-  const matched = storeOrders.filter(o => {
-    const orderPhone = (o.customerPhone || o.phone || '').replace(/\D/g, '');
-    const isPhoneMatch = Boolean(cleanDigits && orderPhone && (orderPhone.endsWith(cleanDigits) || cleanDigits.endsWith(orderPhone)));
-    const isIdMatch = Boolean(o.id && o.id.toLowerCase() === query.toLowerCase());
-    return isPhoneMatch || isIdMatch;
-  });
+  try {
+    const allOrders = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
 
-  return res.json({
-    success: true,
-    orders: matched
-  });
-});
+    const matched = allOrders.filter(o => {
+      const orderPhone = (o.phone || '').replace(/\D/g, '');
+      const isPhoneMatch = Boolean(cleanDigits && orderPhone && (orderPhone.endsWith(cleanDigits) || cleanDigits.endsWith(orderPhone)));
+      const isIdMatch = Boolean(o.id && o.id.toLowerCase() === query.toLowerCase());
+      return isPhoneMatch || isIdMatch;
+    });
 
-// GET Sharding & Partition info for Orders
-orderRouter.get('/shards/stats', (_req, res) => {
-  const counterStats = shardService.getCounterStats('orders_total');
-  const partitions: Record<string, number> = {};
-
-  for (const order of storeOrders) {
-    const shardIndex = shardService.getShardIndex(order.id || '');
-    partitions[`shard_${shardIndex}`] = (partitions[`shard_${shardIndex}`] || 0) + 1;
+    return res.json({
+      success: true,
+      orders: matched.map(formatOrder)
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Order tracking failed' });
   }
-
-  res.json({
-    success: true,
-    totalOrders: storeOrders.length,
-    counterStats,
-    distribution: partitions
-  });
 });
 
-// POST /api/orders/checkout - Secure Server-Side Atomic Order Validation & Placement (N+1 queries prevented)
+// POST /api/orders/checkout - Atomic Server-Side Order Placement
 orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
   try {
-    const { items, customerName, phone, address, deliveryZone, deliveryCharge, deliveryMethodId, paymentMethod, senderPhone, trxId, couponCode, notes, email } = req.body;
+    const { items, customerName, phone, address, deliveryZone, deliveryMethodId, paymentMethod, senderPhone, trxId, couponCode, notes, email } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order must contain at least one item.' });
@@ -149,10 +182,15 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
       return res.status(400).json({ error: addressVal.error || 'Invalid delivery address.' });
     }
 
-    // 1. Authoritative Server-Side Stock & Price Verification (Indexed O(1) Map - Zero N+1 queries)
+    // 1. Authoritative DB Price Check
+    const productIds = items.map((i: any) => i.productId || i.product?.id || i.id).filter(Boolean);
+    const dbProducts = await prisma.product.findMany({
+      where: { id: { in: productIds } }
+    });
+    const productLookupMap = new Map(dbProducts.map(p => [p.id, p]));
+
     let calculatedSubtotal = 0;
     const validatedItems: any[] = [];
-    const productLookupMap = new Map(storeProducts.map(p => [p.id, p]));
 
     for (const item of items) {
       const productId = item.productId || item.product?.id || item.id;
@@ -163,24 +201,6 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
       const regularPrice = matchedProduct ? Number(matchedProduct.regularPrice || unitPrice) : Number(item.regularPrice || unitPrice);
       const title = matchedProduct?.title || item.product?.title || item.title || 'Product';
 
-      // Stock check
-      const currentStock = matchedProduct ? (typeof matchedProduct.stock === 'number' ? matchedProduct.stock : (matchedProduct as any).stockQuantity) : undefined;
-      const canContinueSelling = matchedProduct?.continueSelling === true;
-
-      if (matchedProduct && typeof currentStock === 'number') {
-        if (currentStock < quantity && !canContinueSelling) {
-          return res.status(400).json({
-            error: `Insufficient stock for product "${title}". Available: ${currentStock}`
-          });
-        }
-        // Deduct inventory atomically on server
-        if (typeof matchedProduct.stock === 'number') {
-          matchedProduct.stock -= quantity;
-        } else if (typeof (matchedProduct as any).stockQuantity === 'number') {
-          (matchedProduct as any).stockQuantity -= quantity;
-        }
-      }
-
       calculatedSubtotal += unitPrice * quantity;
       validatedItems.push({
         product: {
@@ -188,87 +208,30 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
           title,
           price: unitPrice,
           regularPrice,
-          image: matchedProduct?.coverImage || item.product?.image || item.product?.coverImage || '',
-          category: matchedProduct?.category || item.product?.category || '',
-          stock: matchedProduct?.stockQuantity || 100,
-          isAvailable: true
+          image: matchedProduct?.image || item.product?.image || item.product?.coverImage || '',
+          category: matchedProduct?.category || item.product?.category || ''
         },
         quantity
       });
     }
 
-    // 2. Authoritative Dynamic Delivery Charge Calculation from Admin Settings
-    let deliveryFee = 60;
-    const deliveryMethods = (storeSettings as any)?.deliveryMethods;
-    if (Array.isArray(deliveryMethods) && deliveryMethods.length > 0) {
-      const match = deliveryMethods.find((m: any) => 
-        (m.id && (m.id === deliveryMethodId || m.id === deliveryZone)) ||
-        (m.title && m.title.trim().toLowerCase() === String(deliveryZone).trim().toLowerCase()) ||
-        (m.status === 'Active' && (
-          m.title.toLowerCase().includes(String(deliveryZone).toLowerCase()) ||
-          String(deliveryZone).toLowerCase().includes(m.title.toLowerCase())
-        ))
-      );
-      if (match) {
-        const baseCharge = Number(match.deliveryCharge) >= 0 ? Number(match.deliveryCharge) : 60;
-        const isWeightBased = match.mode === 'Weight based' || Boolean((storeSettings as any)?.weightBasedDeliveryEnabled && match.mode !== 'Fixed');
-        if (isWeightBased) {
-          const defaultItemWeight = Number((storeSettings as any)?.defaultProductWeightKg) > 0 ? Number((storeSettings as any).defaultProductWeightKg) : 0.5;
-          const totalWeightKg = items.reduce((acc: number, item: any) => {
-            const matchedP = productLookupMap.get(item.productId || item.product?.id || item.id);
-            const w = (typeof matchedP?.weight === 'number' && matchedP.weight > 0) ? matchedP.weight : defaultItemWeight;
-            return acc + (w * Math.max(1, parseInt(item.quantity || 1, 10)));
-          }, 0);
-          const baseWeight = Number(match.baseWeightKg) > 0 ? Number(match.baseWeightKg) : (Number((storeSettings as any)?.defaultBaseWeightKg) || 1);
-          const extraKg = totalWeightKg > baseWeight ? Math.ceil(totalWeightKg - baseWeight) : 0;
-          const isInside = match.title ? (match.title.toLowerCase().includes('inside') || match.title.includes('ভেতরে')) : true;
-          const fallbackRate = isInside 
-            ? (Number((storeSettings as any)?.defaultExtraPerKgInsideDhaka) || 20) 
-            : (Number((storeSettings as any)?.defaultExtraPerKgOutsideDhaka) || 25);
-          const extraRate = Number(match.extraPerKgCharge) >= 0 ? Number(match.extraPerKgCharge) : fallbackRate;
-          deliveryFee = baseCharge + (extraKg * extraRate);
-        } else {
-          deliveryFee = baseCharge;
-        }
-      } else if (deliveryCharge !== undefined && !isNaN(Number(deliveryCharge))) {
-        deliveryFee = Math.max(0, Number(deliveryCharge));
-      } else {
-        const firstActive = deliveryMethods.find((m: any) => m.status === 'Active');
-        deliveryFee = firstActive ? (Number(firstActive.deliveryCharge) || 0) : 60;
-      }
-    } else if (deliveryCharge !== undefined && !isNaN(Number(deliveryCharge))) {
-      deliveryFee = Math.max(0, Number(deliveryCharge));
+    // 2. Delivery charge from DB settings
+    const settings = await getDbSettings();
+    let deliveryFee = 70;
+    if (deliveryZone && String(deliveryZone).toLowerCase().includes('outside')) {
+      deliveryFee = Number(settings.deliveryChargeOutsideDhaka || 120);
     } else {
-      const isInside = deliveryZone === 'inside_dhaka' || 
-                       String(deliveryZone).toLowerCase().includes('inside') || 
-                       String(deliveryZone).includes('ভেতরে');
-      deliveryFee = isInside 
-        ? (Number(storeSettings.deliveryChargeInsideDhaka) || 60) 
-        : (Number(storeSettings.deliveryChargeOutsideDhaka) || 110);
+      deliveryFee = Number(settings.deliveryChargeInsideDhaka || 70);
     }
 
-    const hasFreeDeliveryProduct = validatedItems.some(i => {
-      const p = productLookupMap.get(i.product.id);
-      return p?.deliveryChargeEnabled === false || (p as any)?.freeDelivery === true || (p as any)?.isFreeDelivery === true;
-    });
-
-    if (hasFreeDeliveryProduct || (
-        (storeSettings as any)?.freeDeliveryEnabled && 
-        (storeSettings as any)?.freeDeliveryMinPurchase && 
-        calculatedSubtotal >= Number((storeSettings as any).freeDeliveryMinPurchase)
-    )) {
-      deliveryFee = 0;
-    }
-
-    // 3. Authoritative Coupon Verification
+    // 3. Coupon validation
     let couponDiscount = 0;
-    if (couponCode && typeof couponCode === 'string') {
-      const cleanCoupon = couponCode.trim().toUpperCase();
+    if (couponCode) {
       try {
-        const foundCoupon = await prisma.coupon.findFirst({
-          where: { code: cleanCoupon, status: 'Active' }
+        const foundCoupon = await prisma.coupon.findUnique({
+          where: { code: String(couponCode).trim().toUpperCase() }
         });
-        if (foundCoupon) {
+        if (foundCoupon && foundCoupon.status === 'Active') {
           if (foundCoupon.type === 'percentage') {
             couponDiscount = Math.round(calculatedSubtotal * (foundCoupon.discount / 100));
             if (foundCoupon.maxDiscount && foundCoupon.maxDiscount > 0) {
@@ -278,62 +241,46 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
             couponDiscount = Math.min(calculatedSubtotal, foundCoupon.discount);
           }
         }
-      } catch (err) {
-        console.warn('Coupon DB lookup failed:', err);
-      }
+      } catch {}
     }
 
     const calculatedGrandTotal = Math.max(0, calculatedSubtotal + deliveryFee - couponDiscount);
     const orderId = `ORD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const shardIndex = shardService.getShardIndex(orderId);
-    const timePartition = shardService.getTimePartitionName('orders');
 
-    const confirmedOrder: BookOrder & { _shardMeta?: { shardIndex: number; partition: string } } = {
-      id: orderId,
-      customerName: String(customerName).trim(),
-      phone: phoneVal.cleanedPhone,
-      address: addressVal.cleanedAddress,
-      deliveryZone: deliveryZone || 'inside_dhaka',
-      email: email ? String(email).trim() : undefined,
-      notes: notes ? String(notes).trim() : undefined,
-      deliveryFee,
-      deliveryCharge: deliveryFee,
-
-      items: validatedItems,
-      quantity: validatedItems.reduce((sum, i) => sum + i.quantity, 0),
-      totalPrice: calculatedGrandTotal,
-      totalAmount: calculatedGrandTotal,
-      productName: validatedItems.map(i => `${i.product.title} (x${i.quantity})`).join(', '),
-      productTitle: validatedItems.map(i => `${i.product.title} (x${i.quantity})`).join(', '),
-      status: 'Pending',
-      orderType: 'storefront',
-      paymentMethod: paymentMethod || 'Cash on Delivery',
-      paymentGateway: paymentMethod || 'Cash on Delivery',
-      senderPhone: senderPhone ? String(senderPhone).trim() : undefined,
-      trxId: trxId ? String(trxId).trim() : undefined,
-      couponCode: couponCode ? String(couponCode).trim() : undefined,
-      couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
-      createdAt: new Date().toISOString(),
-      orderDate: new Date().toISOString(),
-      _shardMeta: {
-        shardIndex,
-        partition: timePartition
+    const createdOrder = await prisma.order.create({
+      data: {
+        id: orderId,
+        customerName: String(customerName).trim(),
+        phone: phoneVal.cleanedPhone,
+        address: addressVal.cleanedAddress,
+        deliveryZone: deliveryZone || 'inside_dhaka',
+        email: email ? String(email).trim() : null,
+        deliveryFee,
+        deliveryCharge: deliveryFee,
+        items: JSON.stringify(validatedItems),
+        quantity: validatedItems.reduce((sum, i) => sum + i.quantity, 0),
+        price: calculatedSubtotal,
+        totalPrice: calculatedGrandTotal,
+        totalAmount: calculatedGrandTotal,
+        productName: validatedItems.map(i => `${i.product.title} (x${i.quantity})`).join(', '),
+        productTitle: validatedItems.map(i => `${i.product.title} (x${i.quantity})`).join(', '),
+        status: 'Pending',
+        orderType: 'storefront',
+        paymentMethod: paymentMethod || 'COD',
+        paymentGateway: paymentMethod || 'Cash on Delivery',
+        senderPhone: senderPhone ? String(senderPhone).trim() : null,
+        trxId: trxId ? String(trxId).trim() : null,
+        couponCode: couponCode ? String(couponCode).trim() : null,
+        couponDiscount: couponDiscount > 0 ? couponDiscount : null
       }
-    };
+    });
 
-    // Save order
-    storeOrders.unshift(confirmedOrder);
-    saveOrdersToDisk(storeOrders);
-    broadcastNewOrder(confirmedOrder);
-
-    shardService.incrementCounter('orders_total', 1);
-    globalCache.invalidateTag('orders');
-    globalCache.invalidateTag('products');
-    redundancyService.saveSnapshot('recent_orders_backup', storeOrders.slice(0, 100));
+    const formatted = formatOrder(createdOrder);
+    broadcastNewOrder(formatted);
 
     return res.status(201).json({
       success: true,
-      order: confirmedOrder
+      order: formatted
     });
   } catch (error: any) {
     console.error('Checkout error:', error);
@@ -341,91 +288,96 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
   }
 });
 
-// POST Create Order - with sharded partitioning & distributed counter
-orderRouter.post('/', checkoutRateLimiter, (req, res) => {
-  const rawPhone = req.body.phone || req.body.customerPhone;
-  const rawAddress = req.body.address || req.body.customerAddress;
-  const isPhysicalOrShowroom = req.body.orderType === 'physical' || (rawAddress && String(rawAddress).toLowerCase().includes('showroom'));
+// POST Create Order (Admin manual create)
+orderRouter.post('/', checkoutRateLimiter, async (req, res) => {
+  try {
+    const rawPhone = req.body.phone || req.body.customerPhone;
+    const rawAddress = req.body.address || req.body.customerAddress;
 
-  if (rawPhone && !isPhysicalOrShowroom) {
-    const phoneVal = validateBDPhone(String(rawPhone));
-    if (!phoneVal.isValid) {
-      return res.status(400).json({ error: phoneVal.error || 'Invalid Bangladeshi mobile phone number.' });
-    }
-    req.body.phone = phoneVal.cleanedPhone;
-    if (req.body.customerPhone) req.body.customerPhone = phoneVal.cleanedPhone;
+    const orderId = req.body.id || `ORD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const items = req.body.items ? (typeof req.body.items === 'string' ? req.body.items : JSON.stringify(req.body.items)) : null;
+
+    const created = await prisma.order.create({
+      data: {
+        id: orderId,
+        customerName: req.body.customerName || req.body.name || 'Customer',
+        phone: rawPhone || '',
+        address: rawAddress || '',
+        email: req.body.email || null,
+        deliveryZone: req.body.deliveryZone || null,
+        district: req.body.district || null,
+        thana: req.body.thana || null,
+        deliveryArea: req.body.deliveryArea || null,
+        deliveryFee: req.body.deliveryFee ? Number(req.body.deliveryFee) : null,
+        deliveryCharge: req.body.deliveryCharge ? Number(req.body.deliveryCharge) : 0,
+        items,
+        quantity: req.body.quantity ? Number(req.body.quantity) : 1,
+        price: req.body.price ? Number(req.body.price) : null,
+        unitPrice: req.body.unitPrice ? Number(req.body.unitPrice) : null,
+        totalPrice: req.body.totalPrice ? Number(req.body.totalPrice) : null,
+        totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : (req.body.totalPrice ? Number(req.body.totalPrice) : null),
+        productName: req.body.productName || req.body.productTitle || null,
+        productTitle: req.body.productTitle || req.body.productName || null,
+        status: req.body.status || 'Pending',
+        orderType: req.body.orderType || 'storefront',
+        paymentMethod: req.body.paymentMethod || 'COD',
+        paymentGateway: req.body.paymentGateway || req.body.paymentMethod || 'Cash on Delivery',
+        trxId: req.body.trxId || null,
+        senderPhone: req.body.senderPhone || null,
+        couponCode: req.body.couponCode || null,
+        couponDiscount: req.body.couponDiscount ? Number(req.body.couponDiscount) : null
+      }
+    });
+
+    const formatted = formatOrder(created);
+    broadcastNewOrder(formatted);
+    res.status(201).json(formatted);
+  } catch (error) {
+    console.error('Failed to create order in DB:', error);
+    res.status(500).json({ error: 'Failed to create order' });
   }
-
-  if (rawAddress && !isPhysicalOrShowroom) {
-    const addressVal = validateDeliveryAddress(String(rawAddress));
-    if (!addressVal.isValid) {
-      return res.status(400).json({ error: addressVal.error || 'Invalid delivery address.' });
-    }
-    req.body.address = addressVal.cleanedAddress;
-    if (req.body.customerAddress) req.body.customerAddress = addressVal.cleanedAddress;
-  }
-
-  const orderId = req.body.id || `ORD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const shardIndex = shardService.getShardIndex(orderId);
-  const timePartition = shardService.getTimePartitionName('orders');
-
-  const newOrder: BookOrder & { _shardMeta?: { shardIndex: number; partition: string } } = {
-    id: orderId,
-    createdAt: new Date().toISOString(),
-    status: 'Pending',
-    _shardMeta: {
-      shardIndex,
-      partition: timePartition
-    },
-    ...req.body
-  };
-
-  storeOrders.unshift(newOrder);
-  saveOrdersToDisk(storeOrders);
-  broadcastNewOrder(newOrder);
-
-  // Increment distributed sharded order counter
-  shardService.incrementCounter('orders_total', 1);
-
-  // Invalidate order caches
-  globalCache.invalidateTag('orders');
-
-  // Redundancy snapshot
-  redundancyService.saveSnapshot('recent_orders_backup', storeOrders.slice(0, 100));
-
-  res.status(201).json(newOrder);
 });
 
 // PUT Update Order
-orderRouter.put('/:id', requireAdmin, (req, res) => {
+orderRouter.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const index = storeOrders.findIndex(o => o.id === id);
-  if (index !== -1) {
-    storeOrders[index] = { ...storeOrders[index], ...req.body };
-    saveOrdersToDisk(storeOrders);
+  try {
+    const data = { ...req.body };
+    delete data.id;
+    delete data.createdAt;
+    delete data.updatedAt;
 
-    // Invalidate order caches
-    globalCache.invalidateTag('orders');
+    if (data.items && typeof data.items !== 'string') {
+      data.items = JSON.stringify(data.items);
+    }
 
-    res.json(storeOrders[index]);
-  } else {
-    res.status(404).json({ error: "Order not found" });
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        ...data,
+        price: data.price !== undefined ? Number(data.price) : undefined,
+        totalPrice: data.totalPrice !== undefined ? Number(data.totalPrice) : undefined,
+        totalAmount: data.totalAmount !== undefined ? Number(data.totalAmount) : undefined,
+        deliveryCharge: data.deliveryCharge !== undefined ? Number(data.deliveryCharge) : undefined,
+        quantity: data.quantity !== undefined ? Number(data.quantity) : undefined
+      }
+    });
+
+    res.json(formatOrder(updated));
+  } catch (error) {
+    console.error('Failed to update order in DB:', error);
+    res.status(500).json({ error: 'Failed to update order' });
   }
 });
 
 // DELETE Order
-orderRouter.delete('/:id', requireAdmin, (req, res) => {
+orderRouter.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const index = storeOrders.findIndex(o => o.id === id);
-  if (index !== -1) {
-    storeOrders.splice(index, 1);
-    saveOrdersToDisk(storeOrders);
-
-    // Invalidate order caches
-    globalCache.invalidateTag('orders');
-
+  try {
+    await prisma.order.delete({ where: { id } });
     res.json({ success: true, id });
-  } else {
-    res.status(404).json({ error: "Order not found" });
+  } catch (error) {
+    console.error('Failed to delete order in DB:', error);
+    res.status(500).json({ error: 'Failed to delete order' });
   }
 });

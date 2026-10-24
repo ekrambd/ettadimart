@@ -6,7 +6,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 export const customerRouter = Router();
 
 // GET all customers
-customerRouter.get('/', cacheResponse({ ttlSeconds: 60, staleWhileRevalidateSeconds: 120, tag: 'customers' }), async (req, res) => {
+customerRouter.get('/', async (req, res) => {
   try {
     const items = await prisma.customer.findMany();
     res.json(items);

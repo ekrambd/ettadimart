@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="16" fill="#f8fafc"/>
+  <circle cx="100" cy="85" r="50" fill="#ec4899" opacity="0.12"/>
+  <!-- Trimmer icon -->
+  <rect x="88" y="55" width="24" height="60" rx="6" fill="#d97706"/>
+  <rect x="85" y="42" width="30" height="15" rx="3" fill="#64748b"/>
+  <!-- Trimmer teeth -->
+  <line x1="88" y1="42" x2="88" y2="46" stroke="#ffffff" stroke-width="2"/>
+  <line x1="94" y1="42" x2="94" y2="46" stroke="#ffffff" stroke-width="2"/>
+  <line x1="100" y1="42" x2="100" y2="46" stroke="#ffffff" stroke-width="2"/>
+  <line x1="106" y1="42" x2="106" y2="46" stroke="#ffffff" stroke-width="2"/>
+  <line x1="112" y1="42" x2="112" y2="46" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="100" cy="95" r="3" fill="#ffffff"/>
+  <text x="100" y="160" font-family="'Hind Siliguri', 'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="700" fill="#0f172a" text-anchor="middle">পার্সোনাল কেয়ার</text>
+  <text x="100" y="180" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="600" fill="#64748b" text-anchor="middle">Personal Care</text>
+</svg>

@@ -154,7 +154,7 @@ export class SoftwareLoadBalancer extends EventEmitter {
 
             res.writeHead(proxyRes.statusCode || 200, {
               ...proxyRes.headers,
-              'X-Proxied-By': 'Noor-Load-Balancer',
+              'X-Proxied-By': 'EttadiMart-Load-Balancer',
               'X-Upstream-Server': upstream.id
             });
             proxyRes.pipe(res);
@@ -172,7 +172,7 @@ export class SoftwareLoadBalancer extends EventEmitter {
       });
 
       this.server.listen(this.config.port, () => {
-        console.log(`⚖️  Noor Load Balancer listening on http://localhost:${this.config.port} (${this.config.strategy})`);
+        console.log(`⚖️  Ettadi Mart Load Balancer listening on http://localhost:${this.config.port} (${this.config.strategy})`);
         this.startHealthChecks();
         resolve();
       });

@@ -1,22 +1,59 @@
 import { Router } from 'express';
-import { storeSettings, updateStoreSettings } from '../data/store';
+import { prisma } from '../db';
 import { SteadfastCourierService } from '../services/steadfastService';
 import { PathaoCourierService } from '../services/pathaoService';
 import { FacebookCapiService } from '../services/facebookCapiService';
 import { requireAdmin } from '../middleware/adminAuth';
-import { cacheResponse } from '../middleware/cacheMiddleware';
-import { globalCache } from '../services/cacheEngine';
 import { circuitBreakerRegistry } from '../services/circuitBreaker';
 
 export const settingsRouter = Router();
 export const courierRouter = Router();
 export const facebookRouter = Router();
 
-// Settings Routes - Instant Fresh Data with no-cache
-const handleGetSettings = (_req: any, res: any) => {
+export async function getDbSettings(): Promise<any> {
+  try {
+    const record = await prisma.setting.findUnique({ where: { id: 'global' } });
+    if (record && record.value) {
+      return JSON.parse(record.value);
+    }
+  } catch (err) {
+    console.warn('[settings] DB read error:', err);
+  }
+  return {
+    storeName: 'ETTADI MART',
+    companyName: 'Ettadi Mart',
+    storeTagline: 'China Imported Varieties & Smart Lifestyle Products',
+    topAnnouncementText: '🔥 চায়না থেকে সরাসরি আমদানিকৃত সেরা ট্রেন্ডি গ্যাজেটস ও ভ্যারাইটিজ সমগ্র | সারা দেশে ক্যাশ অন ডেলিভারি!',
+    contactEmail: 'support@ettadimart.com',
+    contactPhone: '01726275850',
+    storeAddress: 'Dhaka, Bangladesh',
+    deliveryChargeInsideDhaka: 70,
+    deliveryChargeOutsideDhaka: 120,
+    storeLogo: '/ettadimart-logo.svg',
+    storeFavicon: '/ettadimart-favicon.svg',
+    categories: [],
+    heroBanners: []
+  };
+}
+
+export async function saveDbSettings(settings: any): Promise<any> {
+  const current = await getDbSettings();
+  const merged = { ...current, ...settings };
+  await prisma.setting.upsert({
+    where: { id: 'global' },
+    create: { id: 'global', value: JSON.stringify(merged) },
+    update: { value: JSON.stringify(merged) }
+  });
+  return merged;
+}
+
+// Settings Routes - Instant Fresh Data directly from DB (No cache)
+const handleGetSettings = async (_req: any, res: any) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+
+  const settings = await getDbSettings();
   const { 
     pixelId: _pixelId, 
     metaApiToken: _metaApiToken, 
@@ -26,11 +63,12 @@ const handleGetSettings = (_req: any, res: any) => {
     pathaoClientPassword: _pathaoClientPassword,
     adminCustomPassword: _adminCustomPassword,
     ...publicSettings 
-  } = storeSettings as any;
+  } = settings;
   res.json(publicSettings);
 };
 
-const handlePostSettings = (req: any, res: any) => {
+const handlePostSettings = async (req: any, res: any) => {
+  const current = await getDbSettings();
   const { 
     pixelId: _pixelId, 
     metaApiToken: _metaApiToken, 
@@ -40,17 +78,12 @@ const handlePostSettings = (req: any, res: any) => {
     ...safeSettings 
   } = req.body;
 
-  // Preserve stored adminCustomPassword across general settings saves
-  if ((storeSettings as any)?.adminCustomPassword) {
-    (safeSettings as any).adminCustomPassword = (storeSettings as any).adminCustomPassword;
+  if (current?.adminCustomPassword && !safeSettings.adminCustomPassword) {
+    safeSettings.adminCustomPassword = current.adminCustomPassword;
   }
 
-  const updated = updateStoreSettings(safeSettings);
-
-  // Invalidate settings cache
-  globalCache.invalidateTag('settings');
-
-  const { adminCustomPassword: _pass, ...cleanUpdated } = updated as any;
+  const updated = await saveDbSettings(safeSettings);
+  const { adminCustomPassword: _pass, ...cleanUpdated } = updated;
   res.json({ success: true, settings: cleanUpdated });
 };
 

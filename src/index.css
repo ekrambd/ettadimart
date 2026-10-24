@@ -4,6 +4,66 @@
 @theme {
   --font-sans: 'Hind Siliguri', 'Plus Jakarta Sans', 'Inter', 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
   --font-serif: 'Hind Siliguri', 'Plus Jakarta Sans', 'Noto Sans Bengali', sans-serif;
+
+  /* Global 6dp (6px) corner radius tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 6px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+}
+
+/* ============================================================
+   GLOBAL DESIGN SYSTEM: 6dp (6px) CORNER RADIUS
+   Cards, Banners, and Buttons strictly set to 6dp (6px)
+   ============================================================ */
+
+/* 1. Global Buttons (6dp / 6px) */
+button:not([class*="rounded-full"]):not([class*="w-"][class*="h-"]),
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"]:not([class*="rounded-full"]),
+.btn,
+a.btn,
+a[class*="rounded-xl"],
+a[class*="rounded-lg"],
+a[class*="rounded-2xl"],
+a[class*="rounded-md"] {
+  border-radius: 6px !important;
+}
+
+/* 2. Global Cards (6dp / 6px) */
+.card,
+[class*="card"],
+[class*="Card"],
+.product-card,
+[data-card],
+div[class*="border"][class*="rounded-xl"],
+div[class*="border"][class*="rounded-2xl"],
+div[class*="border"][class*="rounded-lg"],
+div[class*="shadow"][class*="rounded-xl"],
+div[class*="shadow"][class*="rounded-2xl"],
+div[class*="shadow"][class*="rounded-lg"],
+div[class*="bg-white"][class*="rounded-xl"],
+div[class*="bg-white"][class*="rounded-2xl"] {
+  border-radius: 6px !important;
+}
+
+/* 3. Global Banners (6dp / 6px) */
+.banner,
+[class*="banner"],
+[class*="Banner"],
+.hero-banner,
+.promo-banner,
+div[class*="rounded-2xl"][class*="overflow-hidden"],
+div[class*="rounded-xl"][class*="overflow-hidden"],
+div[class*="rounded-2xl"][class*="bg-gradient"],
+div[class*="rounded-xl"][class*="bg-gradient"] {
+  border-radius: 6px !important;
 }
 
 @layer base {
@@ -240,5 +300,121 @@ video.hero-bg-video::-webkit-media-controls-start-playback-button {
 .admin-panel select,
 .admin-panel textarea {
   font-size: 16px !important;
+}
+
+/* Premium Marquee Banner */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 35s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ==========================================================================
+   Core Motion Physics (Next-Level UI Standards)
+   ========================================================================== */
+:root {
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inertia: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-exit: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Micro-interactions: Snappy, immediate feedback (150ms – 250ms) */
+.motion-snappy {
+  transition-property: transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: var(--ease-snappy);
+  will-change: transform, opacity;
+}
+
+/* Page / Layout transitions: Heavy mass, smooth inertia (400ms – 700ms) */
+.motion-inertia {
+  transition-property: transform, opacity;
+  transition-duration: 500ms;
+  transition-timing-function: var(--ease-inertia);
+  will-change: transform, opacity;
+}
+
+/* Fast dismiss / exit (150ms – 200ms) */
+.motion-exit {
+  transition-property: transform, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-exit);
+}
+
+/* SVG Border Beam Animation */
+@keyframes border-beam {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -410;
+  }
+}
+
+.animate-border-beam {
+  animation: border-beam 4s linear infinite;
+}
+
+/* Production Rule: Respect Accessibility (prefers-reduced-motion) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile Slide-in Drawer & Touch Standards */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (max-width: 768px) {
+  html, body {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Smooth horizontal momentum scroll for mobile category pill bars */
+  .no-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 

@@ -522,7 +522,7 @@ export default function ContactMessagesManager() {
                             <Eye className="h-4 w-4" />
                           </button>
                           <a
-                            href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject || 'FANTINE Skincare Inquiry')}`}
+                            href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject || 'ETTADI MART Inquiry')}`}
                             className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg transition"
                             title="Reply to email"
                           >
@@ -733,7 +733,7 @@ export default function ContactMessagesManager() {
                   </a>
                 )}
                 <a
-                  href={`mailto:${selectedMessage.email}?subject=Re: ${encodeURIComponent(selectedMessage.subject || 'FANTINE Skincare Inquiry')}`}
+                  href={`mailto:${selectedMessage.email}?subject=Re: ${encodeURIComponent(selectedMessage.subject || 'ETTADI MART Inquiry')}`}
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition inline-flex items-center gap-1.5 shadow-md"
                 >
                   <Reply className="h-4 w-4" />

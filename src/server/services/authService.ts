@@ -1,7 +1,7 @@
 import crypto from 'crypto';
-import { storeSettings } from '../data/store';
+import { prisma } from '../db';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fantine-store-secure-vps-admin-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'ettadimart-store-secure-vps-admin-key-2026';
 
 export interface AdminUserPayload {
   uid: string;
@@ -44,66 +44,83 @@ export function generateAdminToken(user: { uid: string; email: string; phone?: s
 }
 
 /**
- * Verify a native HMAC-SHA256 JWT token with zero external cloud dependencies.
+ * Verify and decode an HMAC-SHA256 JWT admin token.
  */
-export function verifyAdminToken(token: string): AdminUserPayload | null {
+export function verifyAdminToken(token: string): { valid: boolean; payload?: AdminUserPayload } {
+  if (!token || typeof token !== 'string') {
+    return { valid: false };
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return { valid: false };
+  }
+
+  const [headerB64, payloadB64, signature] = parts;
+
+  // Re-compute expected signature
+  const expectedSignature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${headerB64}.${payloadB64}`)
+    .digest('base64url');
+
+  if (signature !== expectedSignature) {
+    return { valid: false };
+  }
+
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const [header, payload, signature] = parts;
-
-    const expectedSignature = crypto
-      .createHmac('sha256', JWT_SECRET)
-      .update(`${header}.${payload}`)
-      .digest('base64url');
-
-    // Timing-safe signature comparison
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-      return null;
-    }
-
-    const data = JSON.parse(base64UrlDecode(payload)) as AdminUserPayload;
+    const payload: AdminUserPayload = JSON.parse(base64UrlDecode(payloadB64));
     const now = Math.floor(Date.now() / 1000);
 
-    if (data.exp && data.exp < now) {
-      return null; // Expired
+    if (payload.exp && payload.exp < now) {
+      return { valid: false }; // Expired
     }
 
-    return data;
+    if (!payload.admin) {
+      return { valid: false };
+    }
+
+    return { valid: true, payload };
   } catch {
-    return null;
+    return { valid: false };
   }
 }
 
 /**
- * Verify login credentials against environment variables and persisted store settings.
+ * Verify admin login credentials against DB settings and environment variables.
  */
-export function verifyAdminCredentials(identifier: string, passwordInput: string): { valid: boolean; user?: { uid: string; email: string; phone: string } } {
+export async function verifyAdminCredentials(identifier: string, passwordInput: string): Promise<{ valid: boolean; user?: { uid: string; email: string; phone: string } }> {
   const cleanInput = (identifier || '').trim();
   const digitsInput = cleanInput.replace(/\D/g, '');
 
-  const envEmail = (process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'admin@fantinebd.com').trim().toLowerCase();
-  const envPhone = (process.env.ADMIN_PHONE || process.env.VITE_ADMIN_PHONE || '01329458568').trim();
+  const envEmail = (process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'admin@ettadimart.com').trim().toLowerCase();
+  const envPhone = (process.env.ADMIN_PHONE || process.env.VITE_ADMIN_PHONE || '01726275850').trim();
   const digitsEnvPhone = envPhone.replace(/\D/g, '');
 
   // Master password fallback from environment variables
   const envPassword = (process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || 'admin123').trim();
 
-  // Custom password stored in store settings if modified via admin profile
-  const storedCustomPassword = (storeSettings as any)?.adminCustomPassword || '';
+  // Custom password stored in store settings in DB
+  let storedCustomPassword = '';
+  try {
+    const record = await prisma.setting.findUnique({ where: { id: 'global' } });
+    if (record && record.value) {
+      const parsed = JSON.parse(record.value);
+      storedCustomPassword = parsed?.adminCustomPassword || '';
+    }
+  } catch {}
 
   const isEmailMatch = cleanInput.toLowerCase() === envEmail;
   const isPhoneMatch = Boolean(
     (cleanInput === envPhone) ||
     (digitsInput && digitsEnvPhone && digitsInput === digitsEnvPhone) ||
-    (cleanInput.endsWith('fantinebd.com') && digitsInput && digitsInput === digitsEnvPhone)
+    (cleanInput.endsWith('ettadimart.com') && digitsInput && digitsInput === digitsEnvPhone)
   );
 
   if (!isEmailMatch && !isPhoneMatch) {
     return { valid: false };
   }
 
-  // Verify against custom password or environment password
   const validPassword = storedCustomPassword || envPassword;
   const isPasswordValid = passwordInput === validPassword;
 

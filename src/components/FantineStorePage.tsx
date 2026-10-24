@@ -8,7 +8,7 @@ import {
   ShieldCheck, Truck, RefreshCw, Send, HelpCircle, Eye, Share2, Award,
   Phone, Mail, Globe, Droplet, Sun, Moon, Zap, Flame, Layers, MessageCircle, MessageSquare, ArrowUp, MapPin, ZoomIn, Clock,
   Building2, BookOpen, Microscope, Quote, Sprout, FlaskConical, CreditCard, Smartphone, Copy, Tag,
-  Play, Pause, Volume2, VolumeX, Menu, Package, Layout, Trash2
+  Play, Pause, Volume2, VolumeX, Menu, Package, Layout, Trash2, LayoutGrid, QrCode, Watch, Shirt, ShoppingCart, Home, FileText
 } from 'lucide-react';
 import { trackEvent, createEventId } from '../lib/pixelGtmService';
 import { Product, BookOrder, EcomSettings, InstituteInfo, AboutPageSettings, DeliveryMethodItem, PaymentGatewayItem, Coupon, CategoryItem } from '../types';
@@ -149,43 +149,43 @@ function PahariyaProductCard({
     ? Math.round(((regularPrice! - currentPrice) / regularPrice!) * 100) 
     : (product.discountPercentage || 0);
 
+  const isProductFreeDelivery = product.deliveryChargeEnabled === false || 
+    (product as any).freeDelivery === true || 
+    (product as any).isFreeDelivery === true;
+
   const cardImage = selectedVariant?.image || product.coverImage || product.image || DEFAULT_FANTINE_FALLBACK_IMAGE;
 
-  const variantLabel = variants.some(v => /size|s|m|l|xl|xxl/i.test(v.name) && !/gm|kg|g|l|ml/i.test(v.name))
-    ? 'সাইজ'
-    : 'ওজন';
-
   return (
-    <div className="group flex flex-col bg-white rounded-[6px] border border-slate-200/90 hover:shadow-lg transition-all duration-300 p-2.5 sm:p-3 overflow-hidden justify-between">
+    <div className="group flex flex-col bg-white rounded-[6px] border border-slate-200/90 hover:border-slate-300 hover:shadow-lg transition-all duration-300 p-3 sm:p-3.5 overflow-hidden justify-between">
       <div>
-        {/* Product Image Area */}
+        {/* Product Image Area - Scale Full Width Cover */}
         <div 
-          className="relative aspect-square w-full bg-slate-50 rounded-[4px] overflow-hidden mb-2.5 cursor-pointer" 
+          className="relative aspect-square w-full bg-slate-50 rounded-[6px] overflow-hidden mb-3 cursor-pointer group/img select-none" 
           onClick={() => onOpenDetail(product)}
         >
+          {/* Dynamic Top Promotional Ribbon if configured in DB */}
+          {product.badge && (
+            <div className="absolute top-0 inset-x-0 z-10 bg-gradient-to-r from-[#F37022] to-amber-600 text-white text-[9px] font-black tracking-wide uppercase py-0.5 px-2 text-center shadow-2xs truncate">
+              {product.badge}
+            </div>
+          )}
+
           <img 
             loading="lazy" 
             decoding="async"
-            src={optimizeImageUrl(cardImage, 400)} 
+            src={optimizeImageUrl(cardImage, 500)} 
             alt={product.title}
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
             }}
-            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           />
 
-          {/* Top Left Brand / Store Logo Badge (Pahariya style) */}
-          {displayStoreLogo && (
-            <div className="absolute top-2 left-2 z-10 w-6 h-6 rounded-sm bg-white/90 p-0.5 shadow-xs flex items-center justify-center">
-              <img src={displayStoreLogo} alt="Logo" className="w-full h-full object-contain" />
-            </div>
-          )}
-
-          {/* Top Right Discount Badge */}
+          {/* Top Right Discount Badge if applicable */}
           {hasDiscount && discountPercent > 0 && (
-            <span className="absolute top-2 right-2 bg-[#e53935] text-white text-[10px] font-bold px-2 py-0.5 rounded-[3px] shadow-xs">
-              {discountPercent}% OFF
+            <span className={`absolute ${product.badge ? 'top-6' : 'top-2'} right-2 bg-[#F37022] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] shadow-xs`}>
+              ↓ {discountPercent}%
             </span>
           )}
         </div>
@@ -193,30 +193,43 @@ function PahariyaProductCard({
         {/* Product Title */}
         <h3 
           onClick={() => onOpenDetail(product)}
-          className="text-xs sm:text-sm text-slate-900 hover:text-emerald-800 transition-colors cursor-pointer font-bold text-center line-clamp-2 min-h-[2.5rem]"
+          className="text-[13px] sm:text-sm text-slate-900 hover:text-[#F37022] transition-colors cursor-pointer font-semibold leading-snug line-clamp-2 min-h-[2.5rem]"
+          title={product.title}
         >
           {product.title}
         </h3>
         
-        {/* Price Row */}
-        <div className="flex items-center justify-center gap-2 pt-1 pb-1">
-          <span className="text-sm sm:text-base font-bold text-slate-900">
-            {formatPrice(currentPrice)}
-          </span>
+        {/* Price Row: Discount % + Strikethrough + Bold Price */}
+        <div className="flex items-baseline gap-2 pt-2 pb-0.5">
+          {hasDiscount && (
+            <span className="text-xs font-bold text-[#F37022] shrink-0">
+              ↓ {discountPercent}%
+            </span>
+          )}
           {regularPrice && regularPrice > currentPrice && (
-            <span className="text-xs text-slate-400 line-through">
+            <span className="text-xs text-slate-400 line-through shrink-0">
               {formatPrice(regularPrice)}
             </span>
           )}
+          <span className="text-sm sm:text-base font-extrabold text-slate-900">
+            {formatPrice(currentPrice)}
+          </span>
         </div>
 
-        {/* Size / Weight Variant Selector */}
-        {variants.length > 0 && (
-          <div className="pt-1.5 pb-2 text-center">
-            <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
-              {variantLabel}
+        {/* Free Delivery Note if enabled for this product */}
+        {isProductFreeDelivery && (
+          <div className="text-[11px] font-normal pb-2 flex items-center">
+            <span className="text-emerald-600 font-bold flex items-center gap-1">
+              <Truck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>FREE delivery</span>
             </span>
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
+          </div>
+        )}
+
+        {/* Size / Weight Variant Selector if available */}
+        {variants.length > 0 && (
+          <div className="pb-2">
+            <div className="flex flex-wrap items-center gap-1">
               {variants.map((v) => {
                 const isSelected = selectedVariant?.id === v.id;
                 return (
@@ -227,10 +240,10 @@ function PahariyaProductCard({
                       e.stopPropagation();
                       setSelectedVariantId(v.id);
                     }}
-                    className={`px-3 py-1 rounded-[4px] text-xs font-bold transition-all cursor-pointer border ${
+                    className={`px-2 py-0.5 rounded-[4px] text-[11px] font-semibold transition-all cursor-pointer border ${
                       isSelected
-                        ? 'bg-[#FDD305] text-slate-950 border-[#FDD305] shadow-xs ring-1 ring-amber-400'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-white'
+                        ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
                     {v.name}
@@ -243,24 +256,35 @@ function PahariyaProductCard({
 
       </div>
 
-      {/* Two Stacked Action Buttons (Pahariya Style: Forest Green Add to cart + Orange Buy Now) */}
-      <div className="space-y-1.5 pt-2 mt-auto">
+      {/* Action Buttons: Cart Icon (Add to Cart) + Buy Now Button Feature */}
+      <div className="pt-2 mt-auto flex items-center gap-2">
+        {/* Cart Icon Button (Add to Cart) */}
         <button
           type="button"
-          onClick={() => onAddToCart(product, 1, selectedVariant || undefined)}
-          className="w-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-semibold text-xs py-2 px-3 rounded-[4px] shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToCart(product, 1, selectedVariant || undefined);
+          }}
+          className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-orange-200 active:scale-95 rounded-[6px] transition-all cursor-pointer flex items-center justify-center shadow-2xs group/btn"
+          title="Add to Cart"
+          aria-label="Add to Cart"
         >
-          <ShoppingBag className="w-3.5 h-3.5 text-white" />
-          <span>Add to cart</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onBuyNow(product, selectedVariant || undefined)}
-          className="w-full bg-[#FDD305] hover:bg-[#e6be02] active:scale-95 text-slate-950 font-bold text-xs py-2 px-3 rounded-[4px] shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
-        >
-          <span>Buy Now</span>
+          <ShoppingCart className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2] group-hover/btn:scale-110 transition-transform" />
         </button>
 
+        {/* Buy Now Button Feature */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onBuyNow(product, selectedVariant || undefined);
+          }}
+          className="flex-1 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.98] text-white font-bold text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-[6px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-orange-500/20 whitespace-nowrap"
+          title="Buy Now"
+        >
+          <Zap className="w-3.5 h-3.5 fill-current" />
+          <span>Buy Now</span>
+        </button>
       </div>
     </div>
   );
@@ -344,7 +368,7 @@ function PahariyaFlashSaleSection({
               </span>
             </div>
             <span className="font-bold text-xs">:</span>
-            <div className="flex items-center justify-center bg-white text-rose-600 px-2 sm:px-2.5 py-1 rounded-[4px] min-w-[2.4rem] text-center shadow-xs">
+            <div className="flex items-center justify-center bg-white text-[#F37022] px-2 sm:px-2.5 py-1 rounded-[4px] min-w-[2.4rem] text-center shadow-xs">
               <span className="font-mono text-xs sm:text-sm font-bold animate-pulse">
                 {String(timeLeft.seconds).padStart(2, '0')}s
               </span>
@@ -380,7 +404,7 @@ function PahariyaFlashSaleSection({
               )}
 
               {hasDiscount && discountPercent > 0 && (
-                <span className="absolute top-2.5 right-2.5 bg-[#e53935] text-white text-xs font-bold px-2.5 py-1 rounded-[4px] shadow-xs">
+                <span className="absolute top-2.5 right-2.5 bg-[#F37022] text-white text-xs font-bold px-2.5 py-1 rounded-[4px] shadow-xs">
                   {discountPercent}% OFF
                 </span>
               )}
@@ -392,7 +416,7 @@ function PahariyaFlashSaleSection({
               {/* Product Title */}
               <h3 
                 onClick={() => onOpenDetail(product)}
-                className="text-lg sm:text-2xl font-bold text-slate-900 hover:text-emerald-800 transition-colors cursor-pointer leading-snug line-clamp-2"
+                className="text-lg sm:text-2xl font-bold text-slate-900 hover:text-[#F37022] transition-colors cursor-pointer leading-snug line-clamp-2"
               >
                 {product.title}
               </h3>
@@ -408,7 +432,7 @@ function PahariyaFlashSaleSection({
                   </span>
                 )}
                 {hasDiscount && discountPercent > 0 && (
-                  <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-[4px]">
+                  <span className="text-xs font-bold text-[#F37022] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-[4px]">
                     সেভ {discountPercent}%
                   </span>
                 )}
@@ -431,10 +455,10 @@ function PahariyaFlashSaleSection({
                             e.stopPropagation();
                             setSelectedVariantId(v.id);
                           }}
-                          className={`px-3.5 py-1.5 rounded-[4px] text-xs font-bold transition-all cursor-pointer border ${
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                             isSelected
-                              ? 'bg-[#FDD305] text-slate-950 border-[#FDD305] shadow-xs ring-1 ring-amber-400'
-                              : 'bg-white text-slate-700 border-slate-300 hover:border-amber-400 hover:bg-amber-50/20'
+                              ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                           }`}
                         >
                           {v.name}
@@ -450,17 +474,17 @@ function PahariyaFlashSaleSection({
                 <button
                   type="button"
                   onClick={() => onAddToCart(product, 1, selectedVariant || undefined)}
-                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-semibold text-xs sm:text-sm py-3 px-4 rounded-[4px] shadow-xs transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-orange-50 hover:bg-orange-100 border border-orange-200 text-[#F37022] font-bold text-xs sm:text-sm py-3 px-4 rounded-xl shadow-2xs transition cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <ShoppingBag className="w-4 h-4 text-white" />
-                  <span>কার্ট-এ যোগ করুন</span>
+                  <ShoppingBag className="w-4 h-4 text-[#F37022]" />
+                  <span>Add to Cart</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onBuyNow(product, selectedVariant || undefined)}
-                  className="w-full bg-[#FDD305] hover:bg-[#e6be02] active:scale-95 text-slate-950 font-bold text-xs sm:text-sm py-3 px-4 rounded-[4px] shadow-xs transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-[#F37022] hover:bg-[#d95c10] active:scale-95 text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-xl shadow-md shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <span>অর্ডার করুন</span>
+                  <span>Buy Now</span>
                 </button>
 
               </div>
@@ -506,20 +530,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
 
   // Dynamic Product State from Admin / DB (No Seed Data Overwriting)
-  const [products, setProducts] = useState<FantineProductItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('noor_ecom_products');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((p, idx) => normalizeFantineProduct(p, idx));
-        }
-      }
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  const [products, setProducts] = useState<FantineProductItem[]>([]);
 
   // Helper to find matching product from URL path or router params (supports /product/:slug and legacy /product/:slug/:id)
   const findProductFromPath = useCallback((path: string, slugParam?: string, idParam?: string, productList: FantineProductItem[] = products) => {
@@ -568,33 +579,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   }, [products]);
 
   // Active Selected Product for Detail Page (Deep link aware on initial load)
-  const [activeProductDetail, setActiveProductDetail] = useState<FantineProductItem | null>(() => {
-    try {
-      const cached = localStorage.getItem('noor_ecom_products');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const initialList = parsed.map((p, idx) => normalizeFantineProduct(p, idx));
-          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/product')) {
-            const p = decodeURIComponent(window.location.pathname).toLowerCase();
-            const segMatch = p.match(/\/product\/([^/?#]+)/);
-            const target = segMatch ? segMatch[1].trim() : '';
-            const found = initialList.find(prod => {
-              const slug = (prod.slug || getProductSlug(prod)).toLowerCase();
-              return (target && (slug === target || prod.id.toLowerCase() === target)) ||
-                     (slug.length > 2 && p.includes(slug)) ||
-                     p.includes(prod.id.toLowerCase());
-            });
-            if (found) return found;
-          }
-          return initialList[0] || null;
-        }
-      }
-    } catch {
-      // fallback
-    }
-    return null;
-  });
+  const [activeProductDetail, setActiveProductDetail] = useState<FantineProductItem | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
   const [isHoverZooming, setIsHoverZooming] = useState<boolean>(false);
@@ -640,7 +625,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   const loadLiveProducts = async () => {
     try {
       const dbProds = await dbService.getProducts();
-      if (dbProds && dbProds.length > 0) {
+      if (Array.isArray(dbProds)) {
         const normalized = dbProds.map((p, idx) => normalizeFantineProduct(p, idx));
         setProducts(normalized);
         setActiveProductDetail(prev => {
@@ -649,7 +634,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             if (urlMatch) return urlMatch;
           }
           const match = normalized.find(p => p.id === prev?.id);
-          return match || normalized[0];
+          return match || normalized[0] || null;
         });
         return;
       }
@@ -659,7 +644,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
     try {
       const pubProds = await publicStoreService.getProducts();
-      if (pubProds && pubProds.length > 0) {
+      if (Array.isArray(pubProds)) {
         const normalized = pubProds.map((p, idx) => normalizeFantineProduct(p, idx));
         setProducts(normalized);
         setActiveProductDetail(prev => {
@@ -668,17 +653,22 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             if (urlMatch) return urlMatch;
           }
           const match = normalized.find(p => p.id === prev?.id);
-          return match || normalized[0];
+          return match || normalized[0] || null;
         });
       }
     } catch (err) {
       console.warn('Failed loading from publicStoreService:', err);
+      setProducts([]);
     }
   };
 
-
-
   useEffect(() => {
+    try {
+      localStorage.removeItem('noor_ecom_products');
+      localStorage.removeItem('noor_ecom_settings');
+      localStorage.removeItem('noor_book_orders');
+    } catch {}
+
     loadLiveProducts();
     loadLiveSettings();
 
@@ -738,6 +728,18 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     }
   }, [activeProductDetail?.id]);
 
+  // Prevent background scroll bounce when slide-out drawer or modal is active
+  useEffect(() => {
+    if (isMobileMenuOpen || isCartOpen || isOrderTrackingOpen || isProfileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen, isCartOpen, isOrderTrackingOpen, isProfileOpen]);
+
   const relatedProducts = useMemo(() => {
     if (!activeProductDetail) return [];
     const sameCategory = products.filter(p => 
@@ -794,12 +796,12 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     return () => clearInterval(interval);
   }, [cart.length]);
 
-  // Dynamic Store & Footer Brand Details (From Admin Profile / Store Setup)
-  const displayStoreName = ecomSettings?.storeName || instituteInfo?.name || 'SHOSTIR BAZAR';
-  const displayStoreLogo = ecomSettings?.storeLogo || ecomSettings?.logoUrl || instituteInfo?.logo || '/uploads/file-1792215004226-886642061.jpg';
-  const displayStoreFavicon = ecomSettings?.storeFavicon || ecomSettings?.favicon || instituteInfo?.favicon || instituteInfo?.storeFavicon || '/placeholder-favicon.svg';
+  const displayStoreName = ecomSettings?.storeName || instituteInfo?.name || 'Ettadi Mart';
+  const displayStoreLogo = ecomSettings?.storeLogo || (ecomSettings as any)?.logoUrl || instituteInfo?.logo || '/ettadimart-logo.svg';
+  const displayStoreIcon = '/uploads/file-1792780766111-313750155.jpg';
+  const displayStoreFavicon = ecomSettings?.storeFavicon || ecomSettings?.favicon || instituteInfo?.favicon || (instituteInfo as any)?.storeFavicon || '/ettadimart-favicon.svg';
   const displayCompanyName = ecomSettings?.companyName || instituteInfo?.name || displayStoreName;
-  const displayTagline = ecomSettings?.storeTagline || ecomSettings?.footerDescription || instituteInfo?.description || 'Quality Products & Reliable Delivery.';
+  const displayTagline = ecomSettings?.storeTagline || ecomSettings?.footerDescription || instituteInfo?.description || 'China Direct Varieties';
   const displayEmail = ecomSettings?.contactEmail || instituteInfo?.email || '';
   const displayPhone = ecomSettings?.contactPhone || instituteInfo?.phone || '';
   const displayAddress = ecomSettings?.storeAddress || instituteInfo?.address || '';
@@ -855,8 +857,8 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     if (displayStoreName) {
       const homeTitle = ecomSettings?.storeTagline?.trim()
         ? `${displayStoreName} - ${ecomSettings.storeTagline.trim()}`
-        : `${displayStoreName} - COMFORT TO WELLNESS`;
-      const homeDesc = ecomSettings?.storeTagline?.trim() || aboutSettings?.description || 'SHOSTIR BAZAR - COMFORT TO WELLNESS. Discover premium quality products for your health, comfort, and daily wellness.';
+        : `${displayStoreName} - China Imported Varieties`;
+      const homeDesc = ecomSettings?.storeTagline?.trim() || aboutSettings?.description || 'ETTADI MART - China Imported Varieties. Discover trending smart gadgets, kitchen tools and daily lifestyle varieties delivered across Bangladesh.';
       updateMetaTags(
         homeTitle, 
         homeDesc, 
@@ -866,14 +868,16 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     }
   }, [displayStoreLogo, displayStoreName, ecomSettings?.storeTagline, aboutSettings?.description]);
 
-  // Dynamic SEO based on active view
+  // Dynamic SEO based on active view with Multi-Lingual Keywords (SEO, AEO, GEO)
   useEffect(() => {
     if (activeNav === 'product_detail' && activeProductDetail) {
+      const prodKeywords = `${activeProductDetail.title}, ${activeProductDetail.brand || displayStoreName}, ${activeProductDetail.series || activeProductDetail.category || 'varieties'}, ${activeProductDetail.title} price in bangladesh, buy ${activeProductDetail.title} bd, ${displayStoreName}, ইত্যাদি মার্ট, online shopping bd, cash on delivery bangladesh`;
       updateMetaTags(
         `${activeProductDetail.title} | ${displayStoreName}`,
-        activeProductDetail.subtitle || activeProductDetail.description || 'View product details and clinical formulation.',
+        activeProductDetail.subtitle || activeProductDetail.description || `Buy ${activeProductDetail.title} at ${displayStoreName} with fast cash on delivery across Bangladesh.`,
         activeProductDetail.coverImage || activeProductDetail.image,
-        window.location.href
+        window.location.href,
+        prodKeywords
       );
       updateProductSchema(activeProductDetail, window.location.href, displayStoreName);
       updateBreadcrumbSchema([
@@ -893,11 +897,13 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
         currency: 'BDT'
       }, eventId);
     } else if (activeNav === 'shop') {
+      const shopKeywords = 'shop online bangladesh, variety products bd, smart gadgets dhaka, kitchen tools online, china direct products, ettadi mart collection, ইত্যাদি মার্ট শপ, ক্যাশ অন ডেলিভারি';
       updateMetaTags(
         `Shop All Products | ${displayStoreName}`,
-        aboutSettings?.description || `Browse our complete catalog of quality products at ${displayStoreName}.`,
+        aboutSettings?.description || `Browse our complete catalog of quality China imported variety products and smart gadgets at ${displayStoreName}. Fast delivery across Bangladesh.`,
         displayStoreLogo,
-        window.location.href
+        window.location.href,
+        shopKeywords
       );
       updateProductSchema(null, window.location.href, displayStoreName);
       updateBreadcrumbSchema([
@@ -907,18 +913,20 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     } else if (activeNav === 'about') {
       updateMetaTags(
         `About Us | ${displayStoreName}`,
-        aboutSettings?.subtitle || aboutSettings?.description || `Learn about our story and mission at ${displayStoreName}.`,
+        aboutSettings?.subtitle || aboutSettings?.description || `Learn about our story, mission, and direct China importing at ${displayStoreName}.`,
         displayStoreLogo,
-        window.location.href
+        window.location.href,
+        'about ettadi mart, ইত্যাদি মার্ট সম্পর্কে, china importer bangladesh, trustworthy ecommerce bd'
       );
       updateProductSchema(null, window.location.href, displayStoreName);
       updateBreadcrumbSchema([]);
     } else if (activeNav === 'contact') {
       updateMetaTags(
         `Contact Us & Customer Support | ${displayStoreName}`,
-        'Get in touch with our customer care team via WhatsApp, phone, or email.',
+        'Get in touch with our customer care team via WhatsApp, phone, or email. Hotline: +8801726275850.',
         displayStoreLogo,
-        window.location.href
+        window.location.href,
+        'contact ettadi mart, ইত্যাদি মার্ট হেল্পলাইন, customer support bangladesh'
       );
       updateProductSchema(null, window.location.href, displayStoreName);
       updateBreadcrumbSchema([]);
@@ -941,13 +949,15 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
       updateProductSchema(null, window.location.href, displayStoreName);
       updateBreadcrumbSchema([]);
     } else if (activeNav === 'home') {
-      const homeTitle = `${displayStoreName} - COMFORT TO WELLNESS | স্বস্তির বাজার Official Store`;
-      const homeDesc = `${displayStoreName} (স্বস্তির বাজার) - COMFORT TO WELLNESS. Discover premium organic dates, fresh dry fruits, raw nuts, seeds, and healthy lifestyle products delivered across Bangladesh.`;
+      const homeTitle = `${displayStoreName} | ইত্যাদি মার্ট - China Imported Varieties | Online Shopping BD`;
+      const homeDesc = `${displayStoreName} (ইত্যাদি মার্ট) - চায়না থেকে সরাসরি আমদানিকৃত সেরা ট্রেন্ডি স্মার্ট গ্যাজেটস, হোম ও কিচেন ভ্যারাইটিজ সমগ্র। সারা বাংলাদেশে দ্রুত ক্যাশ অন ডেলিভারি।`;
+      const homeKeywords = 'ettadi mart, ettadimart, ettadi mart bd, ইত্যাদি মার্ট, ইত্তাদি মার্ট, china imported gadgets bd, smart lifestyle bangladesh, kitchen gadgets online shopping bd, smart home tools bangladesh, online shopping bangladesh, ক্যাশ অন ডেলিভারি শপিং, সেরা অনলাইন শপ, চায়না প্রোডাক্ট বাংলাদেশ, trending items bd, variety store dhaka';
       updateMetaTags(
         homeTitle,
         homeDesc,
         displayStoreLogo,
-        window.location.origin
+        window.location.origin,
+        homeKeywords
       );
       updateProductSchema(null, window.location.origin, displayStoreName);
       updateBreadcrumbSchema([]);
@@ -1165,16 +1175,13 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
         if (pCat === cat || pSeries === cat) return true;
         
-        // Smart keyword fallbacks for wellness/organic e-commerce
-        if (cat === 'honey') return pCat.includes('honey') || pTitle.includes('honey') || pTitle.includes('মধু');
-        if (cat === 'ghee') return pCat.includes('ghee') || pTitle.includes('ghee') || pTitle.includes('ঘি');
-        if (cat === 'nuts') return pCat.includes('nut') || pTitle.includes('nut') || pTitle.includes('বাদাম');
-        if (cat === 'oil') return pCat.includes('oil') || pTitle.includes('oil') || pTitle.includes('তেল');
-        if (cat === 'super food') return pCat.includes('super') || pTitle.includes('super') || pTitle.includes('ফুড');
-        if (cat === 'combo') return pCat.includes('combo') || pTitle.includes('combo') || pTitle.includes('কম্বো');
-        if (cat === 'wellness') return pCat.includes('well') || pTitle.includes('well') || pTitle.includes('স্বাস্থ্য');
-        if (cat === 'mango') return pCat.includes('mango') || pTitle.includes('mango') || pTitle.includes('আম');
-        if (cat === 'herbs') return pCat.includes('herb') || pTitle.includes('herb') || pTitle.includes('ভেষজ');
+        // Smart keyword fallbacks for China imported variety e-commerce
+        if (cat.includes('gadget') || cat.includes('গ্যাজেট')) return pCat.includes('gadget') || pTitle.includes('গ্যাজেট') || pTitle.includes('লাইট') || pTitle.includes('চার্জার') || pTitle.includes('ব্লেন্ডার');
+        if (cat.includes('kitchen') || cat.includes('কিচেন')) return pCat.includes('kitchen') || pTitle.includes('কিচেন') || pTitle.includes('সিলার') || pTitle.includes('কাটার') || pTitle.includes('চপার');
+        if (cat.includes('utility') || cat.includes('ইউটিলিটি')) return pCat.includes('utility') || pTitle.includes('ইউটিলিটি') || pTitle.includes('ল্যাম্প') || pTitle.includes('ক্লিনার');
+        if (cat.includes('personal') || cat.includes('পার্সোনাল')) return pCat.includes('personal') || pTitle.includes('পার্সোনাল') || pTitle.includes('ট্রিমার') || pTitle.includes('শেভার');
+        if (cat.includes('tool') || cat.includes('টুলস')) return pCat.includes('tool') || pTitle.includes('টুলস') || pTitle.includes('স্প্রে') || pTitle.includes('গান');
+        if (cat.includes('trending') || cat.includes('ট্রেন্ডিং')) return Boolean(p.isFeatured || p.isNewArrival || pTitle.includes('ট্রেন্ডিং'));
         if (cat === 'popular') return Boolean(p.isFeatured || (p.rating && p.rating >= 4.5) || pTitle.includes('popular'));
 
         return pCat.includes(cat) || pSeries.includes(cat) || pTitle.includes(cat);
@@ -1200,6 +1207,11 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
   const shopCategories = useMemo(() => {
     const set = new Set<string>();
+    if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems)) {
+      ecomSettings.categoryItems.forEach(c => {
+        if (c?.name && c.name.trim()) set.add(c.name.trim());
+      });
+    }
     if (ecomSettings?.categories && Array.isArray(ecomSettings.categories)) {
       ecomSettings.categories.forEach(c => {
         if (typeof c === 'string' && c.trim()) set.add(c.trim());
@@ -1212,7 +1224,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
     });
     const custom = Array.from(set);
     return custom.length > 0 ? ['All', ...custom] : ['All'];
-  }, [products, ecomSettings?.categories]);
+  }, [products, ecomSettings?.categoryItems, ecomSettings?.categories]);
 
   // Dynamic Categories strictly from Admin Panel and Live Catalog (Not Static)
   const headerCategories = useMemo(() => {
@@ -1271,119 +1283,76 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   };
 
   const displayCategories = useMemo(() => {
-    // 6 Specific categories matching the reference screenshot:
-    // Date, Ghee, Super Food, Popular, Nuts, Honey
-    const primaryCategories = [
-      {
-        id: 'date',
-        name: 'Date',
-        targetCategory: 'Date',
-        fallbackImage: '/uploads/file-1792008302322-954151091.jpg',
-        matcher: (p: any) => p.title?.includes('আজুয়া') || p.category?.toLowerCase() === 'date'
-      },
-      {
-        id: 'ghee',
-        name: 'Ghee',
-        targetCategory: 'Ghee',
-        fallbackImage: '/uploads/file-1792005519018-520389445.jpg',
-        matcher: (p: any) => p.title?.includes('ঘি') || p.category?.toLowerCase() === 'ghee'
-      },
-      {
-        id: 'super-food',
-        name: 'Super Food',
-        targetCategory: 'Super Food',
-        fallbackImage: '/uploads/file-1792008102063-753198725.jpg',
-        matcher: (p: any) => p.title?.includes('কিসমিস') || p.category?.toLowerCase() === 'super food'
-      },
-      {
-        id: 'popular',
-        name: 'Popular',
-        targetCategory: 'Date',
-        fallbackImage: '/uploads/file-1792008232986-551579138.jpg',
-        matcher: (p: any) => p.title?.includes('সুক্কারী')
-      },
-      {
-        id: 'nuts',
-        name: 'Nuts',
-        targetCategory: 'Nuts',
-        fallbackImage: '/uploads/file-1792008679391-28565173.jpg',
-        matcher: (p: any) => p.title?.includes('কাঠ বাদাম') || p.category?.toLowerCase() === 'nuts'
-      },
-      {
-        id: 'honey',
-        name: 'Honey',
-        targetCategory: 'Honey',
-        fallbackImage: '/uploads/file-1792007998814-75550648.jpg',
-        matcher: (p: any) => p.title?.includes('মধু') || p.category?.toLowerCase() === 'honey'
+    // 1. Categories configured in Admin Panel CategoryManager (categoryItems)
+    if (Array.isArray(ecomSettings?.categoryItems) && ecomSettings.categoryItems.length > 0) {
+      const activeItems = ecomSettings.categoryItems
+        .filter(item => item && item.name && item.name.trim().length > 0)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+      if (activeItems.length > 0) {
+        return activeItems.map(item => {
+          const catName = item.name.trim();
+          // Find matching product image if category item doesn't have an uploaded image
+          const matchedProd = products.find(p => 
+            p.category?.toLowerCase() === catName.toLowerCase() ||
+            p.subCategory?.toLowerCase() === catName.toLowerCase()
+          );
+          const resolvedImage = item.image || matchedProd?.image || (matchedProd as any)?.coverImage || '';
+          return {
+            id: item.id || `cat-${catName}`,
+            name: catName,
+            targetCategory: catName,
+            image: resolvedImage
+          };
+        });
       }
-    ];
-
-    if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems) && ecomSettings.categoryItems.length >= 4) {
-      return ecomSettings.categoryItems.map(item => ({
-        id: item.id || item.name,
-        name: item.name,
-        targetCategory: item.name,
-        image: item.image || products.find(p => p.category?.toLowerCase() === item.name.toLowerCase())?.image || DEFAULT_FANTINE_FALLBACK_IMAGE
-      }));
     }
 
-    return primaryCategories.map(cat => {
-      const matched = products.find(cat.matcher);
-      const img = matched?.image || (matched as any)?.coverImage || cat.fallbackImage;
-      return {
-        id: cat.id,
-        name: cat.name,
-        targetCategory: cat.targetCategory,
-        image: img
-      };
-    });
-  }, [ecomSettings?.categoryItems, products]);
+    // 2. Categories string array from Admin Panel (ecomSettings.categories)
+    if (Array.isArray(ecomSettings?.categories) && ecomSettings.categories.length > 0) {
+      const catNames = ecomSettings.categories
+        .map(c => (typeof c === 'string' ? c.trim() : (c as any)?.name?.trim()))
+        .filter(Boolean) as string[];
 
-  // Deterministic daily category selection (Changes once every 24 hours at midnight)
-  const dailyCategoryData = useMemo(() => {
-    if (!products || products.length === 0) return null;
-
-    // 1. Group products by non-empty category
-    const catMap = new Map<string, FantineProductItem[]>();
-    products.forEach(p => {
-      const cat = (p.category || (p as any).series || '').trim();
-      if (cat) {
-        if (!catMap.has(cat)) catMap.set(cat, []);
-        catMap.get(cat)!.push(p);
+      if (catNames.length > 0) {
+        return catNames.map((catName, idx) => {
+          const matchedProd = products.find(p => 
+            p.category?.toLowerCase() === catName.toLowerCase() ||
+            p.subCategory?.toLowerCase() === catName.toLowerCase()
+          );
+          const resolvedImage = matchedProd?.image || (matchedProd as any)?.coverImage || '';
+          return {
+            id: `cat-${idx}-${catName}`,
+            name: catName,
+            targetCategory: catName,
+            image: resolvedImage
+          };
+        });
       }
-    });
-
-    const availableCategories = Array.from(catMap.keys()).sort();
-
-    if (availableCategories.length === 0) {
-      return {
-        categoryName: 'আজকের নির্বাচিত পণ্য',
-        products: products.slice(0, 4)
-      };
     }
 
-    // 2. Deterministic day seed from local calendar date (e.g. 20261015)
-    // Same day will ALWAYS yield the exact same category
-    // Next day (midnight) will automatically shift to the next category
-    const now = new Date();
-    const daySeed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-
-    const selectedIndex = Math.abs(daySeed) % availableCategories.length;
-    const selectedCategoryName = availableCategories[selectedIndex];
-    const categoryProducts = catMap.get(selectedCategoryName) || [];
-
-    // Up to 4 products from this category (padded with other products if category has fewer)
-    let displayProducts = categoryProducts.slice(0, 4);
-    if (displayProducts.length < 4 && products.length >= 4) {
-      const remaining = products.filter(p => !displayProducts.some(dp => dp.id === p.id));
-      displayProducts = [...displayProducts, ...remaining.slice(0, 4 - displayProducts.length)];
+    // 3. Fallback to distinct categories derived from real products in DB
+    if (Array.isArray(products) && products.length > 0) {
+      const distinctCats = Array.from(new Set(products.map(p => p.category?.trim()).filter(Boolean) as string[]));
+      if (distinctCats.length > 0) {
+        return distinctCats.map((catName, idx) => {
+          const matchedProd = products.find(p => p.category?.toLowerCase() === catName.toLowerCase());
+          const resolvedImage = matchedProd?.image || (matchedProd as any)?.coverImage || '';
+          return {
+            id: `cat-prod-${idx}-${catName}`,
+            name: catName,
+            targetCategory: catName,
+            image: resolvedImage
+          };
+        });
+      }
     }
 
-    return {
-      categoryName: selectedCategoryName,
-      products: displayProducts
-    };
-  }, [products]);
+    // If no real categories exist, return empty array (no fake or static data)
+    return [];
+  }, [ecomSettings?.categoryItems, ecomSettings?.categories, products]);
+
+
 
   const totalPages = Math.ceil(filteredCatalog.length / itemsPerPage) || 1;
 
@@ -1492,7 +1461,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
   const couponDiscountAmount = useMemo(() => {
     if (!appliedCoupon) return 0;
-    if (appliedCoupon.type === 'percent') {
+    if (appliedCoupon.type === 'percentage' || (appliedCoupon.type as any) === 'percent') {
       const disc = Math.round((cartSubtotal * appliedCoupon.discount) / 100);
       return appliedCoupon.maxDiscount ? Math.min(disc, appliedCoupon.maxDiscount) : disc;
     }
@@ -1687,7 +1656,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   }, [activeProductDetail]);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans relative selection:bg-rose-100 selection:text-rose-900">
+    <div className="min-h-screen bg-white text-slate-900 font-sans relative selection:bg-orange-100 selection:text-orange-950 pb-16 md:pb-0">
       
       {/* Toast Notification */}
       {showNotificationToast.show && (
@@ -1698,38 +1667,85 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
       )}
 
       {/* ============================================================
-          PRIMARY #FDD305 TOP HEADER APPBAR & DYNAMIC CATEGORY BAR
+          POSH TOP HEADER: NATIVE MOBILE APP BAR & DESKTOP CARTUP BAR
           ============================================================ */}
-      <header className="sticky top-0 z-40 bg-[#FDD305] text-slate-900 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-6">
-          
-          {/* Left: Brand Logo (Always refreshes to home on click) */}
-          <div className="flex items-center shrink-0">
-            <button 
-              type="button"
-              className="flex items-center cursor-pointer group shrink-0 border-0 bg-transparent p-0 transition-transform active:scale-95" 
-              onClick={handleHomeClick}
-              title={`${displayStoreName} - হোম`}
-            >
-              <div className="bg-white rounded-lg px-2 py-1 shadow-2xs border border-amber-300/60 flex items-center justify-center">
+      <header className="sticky top-0 z-40 bg-white text-slate-900 border-b border-slate-100 shadow-xs">
+        {/* MOBILE APP HEADER (sm:hidden) */}
+        <div className="sm:hidden px-3 pt-2.5 pb-2">
+          {/* Mobile Top Row: Hamburger + Brand + Track + Cart */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="p-1.5 -ml-1 text-slate-800 hover:text-[#F37022] hover:bg-orange-50 active:scale-95 transition-all rounded-[6px] cursor-pointer shrink-0"
+                title="Open Navigation Menu"
+                aria-label="Open Navigation Menu"
+              >
+                <Menu className="w-5 h-5 stroke-[2.2]" />
+              </button>
+              
+              <button 
+                type="button"
+                className="flex items-center gap-2 cursor-pointer group shrink-0 border-0 bg-transparent p-0 transition-transform active:scale-95 text-left" 
+                onClick={handleHomeClick}
+                title={`${displayStoreName} - Home`}
+              >
                 <img 
-                  src={displayStoreLogo} 
+                  src={displayStoreLogo || '/ettadimart-logo.svg'} 
                   alt={displayStoreName} 
-                  className="h-8 sm:h-9 md:h-10 w-auto max-w-[140px] sm:max-w-[180px] md:max-w-[200px] object-contain" 
+                  className="h-8 w-8 object-contain rounded-[6px] shrink-0 shadow-2xs" 
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/uploads/file-1792215004226-886642061.jpg';
+                    e.currentTarget.src = '/ettadimart-favicon.svg';
                   }}
                 />
-              </div>
-            </button>
+                <div className="flex flex-col justify-center min-w-0">
+                  <span className="font-black text-sm tracking-tight text-slate-900 leading-tight">
+                    {displayStoreName.trim() || 'Ettadi Mart'}
+                  </span>
+                  {displayTagline && (
+                    <span className="text-[9px] font-medium text-slate-500 tracking-tight line-clamp-1 max-w-[130px] leading-tight mt-0.5">
+                      {displayTagline.trim()}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsOrderTrackingOpen(true)}
+                className="p-1.5 text-slate-700 hover:text-[#F37022] hover:bg-orange-50 active:scale-95 transition-all rounded-[6px] cursor-pointer"
+                title="Track Order"
+                aria-label="Track Order"
+              >
+                <Truck className="w-5 h-5 stroke-[2]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                className="relative p-1.5 text-slate-800 hover:text-[#F37022] active:scale-95 transition-all rounded-[6px] cursor-pointer"
+                title="Shopping Cart"
+                aria-label="Shopping Cart"
+              >
+                <ShoppingCart className="w-5 h-5 stroke-[2.2]" />
+                {totalCartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-[#F37022] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                    {totalCartCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Center: Full-Width Responsive Search Bar */}
-          <div className="relative flex-1 min-w-0 max-w-xl mx-1 sm:mx-3">
+          {/* Mobile Full-Width Search Input Row */}
+          <div className="relative mt-2">
             <form 
               onSubmit={handleExecuteSearch}
-              className="relative flex items-center bg-white rounded-md overflow-hidden shadow-xs border border-amber-300 focus-within:border-slate-900 transition-all w-full"
+              className="relative flex items-center bg-[#f8fafc] hover:bg-slate-100/80 focus-within:bg-white rounded-full overflow-hidden border border-slate-200 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-orange-200/50 transition-all w-full pl-3.5 pr-1 py-0.5 shadow-2xs"
             >
               <input
                 type="text"
@@ -1749,8 +1765,8 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 onBlur={() => {
                   setTimeout(() => setIsSearchDropdownOpen(false), 250);
                 }}
-                placeholder={`Search in ${displayStoreName}...`}
-                className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-500 focus:outline-none"
+                placeholder="Search products, China varieties, gadgets..."
+                className="w-full py-1 text-xs text-slate-800 placeholder:text-slate-400 bg-transparent focus:outline-none"
               />
 
               {searchTerm.trim() && (
@@ -1760,28 +1776,28 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     setSearchTerm('');
                     setIsSearchDropdownOpen(false);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors mr-1 cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors mr-1 cursor-pointer"
                   title="Clear"
                 >
-                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
 
               <button
                 type="submit"
-                className="bg-slate-950 hover:bg-slate-800 active:bg-black text-white px-3.5 sm:px-5 py-2 sm:py-2.5 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                className="bg-[#F37022] hover:bg-[#d95c10] active:bg-[#c24f0c] text-white w-7 h-7 rounded-full transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-xs"
                 title="Search"
               >
-                <Search className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                <Search className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
             </form>
 
-            {/* Quick Live Autocomplete Dropdown */}
+            {/* Mobile Autocomplete Suggestions Dropdown */}
             {isSearchDropdownOpen && searchSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-md shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 max-h-[380px] overflow-y-auto text-slate-900">
-                <div className="p-2.5 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider flex justify-between items-center">
-                  <span className="text-slate-800">অনুসন্ধান ফলাফল ({searchSuggestions.length})</span>
-                  <span className="text-[10px] font-normal text-slate-400">এন্টার চাপুন বা ক্লিক করুন</span>
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[6px] shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 max-h-[340px] overflow-y-auto text-slate-900">
+                <div className="p-2 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase tracking-wider flex justify-between items-center">
+                  <span className="text-slate-800">Results ({searchSuggestions.length})</span>
+                  <span className="text-[10px] font-normal text-slate-400">Click to view</span>
                 </div>
                 {searchSuggestions.map((prod) => (
                   <div
@@ -1791,7 +1807,137 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       setIsSearchDropdownOpen(false);
                       openProductDetail(prod);
                     }}
-                    className="flex items-center gap-3 p-2.5 hover:bg-amber-50/80 transition-colors cursor-pointer"
+                    className="flex items-center gap-2.5 p-2 hover:bg-orange-50/60 transition-colors cursor-pointer"
+                  >
+                    <img 
+                      src={prod.image || '/placeholder-product.svg'} 
+                      alt={prod.title} 
+                      className="w-9 h-9 object-contain rounded-[6px] bg-white border border-slate-100 shrink-0" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{prod.title}</p>
+                      <p className="text-xs text-[#F37022] font-bold">
+                        {currency} {prod.price.toLocaleString('bn-BD')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setIsSearchDropdownOpen(false);
+                    handleExecuteSearch();
+                  }}
+                  className="w-full py-2 px-3 bg-slate-50 hover:bg-orange-50 text-[#F37022] text-xs font-bold text-center transition-colors block cursor-pointer"
+                >
+                  View all results &rarr;
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* DESKTOP HEADER (hidden sm:flex) */}
+        <div className="hidden sm:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 items-center justify-between gap-3 sm:gap-6">
+          
+          {/* Left: Brand Logo Icon + Store Name & Tagline */}
+          <div className="flex items-center shrink-0">
+            <button 
+              type="button"
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group shrink-0 border-0 bg-transparent p-0 transition-transform active:scale-95 text-left" 
+              onClick={handleHomeClick}
+              title={`${displayStoreName} - Home`}
+            >
+              <img 
+                src={displayStoreLogo || '/ettadimart-logo.svg'} 
+                alt={displayStoreName} 
+                className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 object-contain rounded-lg shrink-0 shadow-2xs" 
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/ettadimart-favicon.svg';
+                }}
+              />
+              <div className="flex flex-col justify-center min-w-0">
+                <span className="font-black text-sm sm:text-base md:text-lg tracking-tight text-slate-900 group-hover:text-[#F37022] transition-colors whitespace-nowrap leading-tight">
+                  {displayStoreName.trim() || 'Ettadi Mart'}
+                </span>
+                {displayTagline && (
+                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 tracking-tight line-clamp-1 max-w-[120px] sm:max-w-[180px] md:max-w-[240px] leading-tight mt-0.5">
+                    {displayTagline.trim()}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+
+          {/* Center: Full-Width Sleek Rounded-Full Search Bar */}
+          <div className="relative flex-1 min-w-0 max-w-xl mx-1 sm:mx-3">
+            <form 
+              onSubmit={handleExecuteSearch}
+              className="relative flex items-center bg-[#f8fafc] hover:bg-slate-100/70 focus-within:bg-white rounded-full overflow-hidden border border-slate-200 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-orange-200/50 transition-all w-full pl-3.5 pr-1 py-0.5 shadow-2xs"
+            >
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchTerm(val);
+                  setIsSearchDropdownOpen(Boolean(val.trim()));
+                  setCurrentPage(1);
+                  if (val.trim() && activeNav !== 'shop') {
+                    navigateTo('shop');
+                  }
+                }}
+                onFocus={() => {
+                  if (searchTerm.trim()) setIsSearchDropdownOpen(true);
+                }}
+                onBlur={() => {
+                  setTimeout(() => setIsSearchDropdownOpen(false), 250);
+                }}
+                placeholder="Search products, China varieties, gadgets, home..."
+                className="w-full py-1 text-xs sm:text-[13px] text-slate-800 placeholder:text-slate-400 bg-transparent focus:outline-none"
+              />
+
+              {searchTerm.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setIsSearchDropdownOpen(false);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors mr-1 cursor-pointer"
+                  title="Clear"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="bg-[#F37022] hover:bg-[#d95c10] active:bg-[#c24f0c] text-white w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-xs"
+                title="Search"
+              >
+                <Search className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </form>
+
+            {/* Live Autocomplete Dropdown */}
+            {isSearchDropdownOpen && searchSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 max-h-[380px] overflow-y-auto text-slate-900">
+                <div className="p-2.5 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider flex justify-between items-center">
+                  <span className="text-slate-800">Search Results ({searchSuggestions.length})</span>
+                  <span className="text-[10px] font-normal text-slate-400">Click to view</span>
+                </div>
+                {searchSuggestions.map((prod) => (
+                  <div
+                    key={prod.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setIsSearchDropdownOpen(false);
+                      openProductDetail(prod);
+                    }}
+                    className="flex items-center gap-3 p-2.5 hover:bg-orange-50/60 transition-colors cursor-pointer"
                   >
                     <img 
                       src={prod.image || '/placeholder-product.svg'} 
@@ -1802,9 +1948,9 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{prod.title}</p>
                       <p className="text-xs text-slate-950 font-bold">
                         {currency} {prod.price.toLocaleString('bn-BD')}
-                        {prod.originalPrice && prod.originalPrice > prod.price && (
+                        {((prod as any).originalPrice || prod.regularPrice) && ((prod as any).originalPrice || prod.regularPrice) > prod.price && (
                           <span className="ml-1.5 text-[11px] text-slate-400 line-through font-normal">
-                            {currency} {prod.originalPrice.toLocaleString('bn-BD')}
+                            {currency} {Number((prod as any).originalPrice || prod.regularPrice).toLocaleString('bn-BD')}
                           </span>
                         )}
                       </p>
@@ -1818,102 +1964,145 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     setIsSearchDropdownOpen(false);
                     handleExecuteSearch();
                   }}
-                  className="w-full py-2.5 px-3 bg-[#FDD305] hover:bg-[#e6be02] text-slate-950 text-xs font-bold text-center transition-colors block cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-slate-50 hover:bg-orange-50 text-[#F37022] text-xs font-bold text-center transition-colors block cursor-pointer"
                 >
-                  সকল ফলাফল দেখুন &rarr;
+                  View all results &rarr;
                 </button>
               </div>
             )}
           </div>
 
-          {/* Right: 3 Action Items (Order Track, Cart, Profile) */}
-          <div className="flex items-center gap-2 sm:gap-4 md:gap-5 shrink-0 text-slate-900 min-w-[170px] sm:min-w-[195px] justify-end">
-            {/* 1. Order Track */}
+          {/* Right: Modern Redesigned Account & Cart */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 text-slate-900 justify-end">
+            {/* Account & Lists */}
             <button 
               type="button"
-              onClick={() => setIsOrderTrackingOpen(true)}
-              className="flex flex-col items-center justify-center text-slate-900 hover:text-black transition-colors cursor-pointer group py-0.5 min-w-[50px] sm:min-w-[56px] shrink-0"
-              title="Order Track"
+              onClick={() => setIsProfileOpen(true)}
+              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-[6px] hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all cursor-pointer group text-left"
+              title="Account & Lists"
             >
-              <div className="relative flex items-center justify-center">
-                <Truck className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-slate-900 group-hover:scale-105 transition-transform" />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[6px] bg-slate-100 group-hover:bg-[#F37022]/10 text-slate-600 group-hover:text-[#F37022] flex items-center justify-center transition-colors shrink-0">
+                <User className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold tracking-tight mt-0.5 whitespace-nowrap overflow-visible">Order Track</span>
+              <div className="flex flex-col text-left leading-tight">
+                <span className="text-[10px] text-slate-400 font-medium">Hello, Guest</span>
+                <div className="flex items-center gap-0.5 text-xs font-bold text-slate-800 group-hover:text-[#F37022] transition-colors">
+                  <span>Account & Lists</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-[#F37022] transition-colors" />
+                </div>
+              </div>
             </button>
 
-            {/* 2. Cart */}
+            {/* Subtle Vertical Divider */}
+            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Cart with Icon, Badge & Price (No redundant 'Cart' text) */}
             <button 
               type="button"
               onClick={() => setIsCartOpen(true)}
-              className="flex flex-col items-center justify-center text-slate-900 hover:text-black transition-colors cursor-pointer group py-0.5 min-w-[44px] sm:min-w-[50px] shrink-0"
+              className="flex items-center gap-2 sm:gap-2.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-[6px] bg-white hover:bg-orange-50/40 border border-slate-200/90 hover:border-[#F37022] text-slate-800 transition-all cursor-pointer group shadow-2xs hover:shadow-xs"
               title="Shopping Cart"
             >
-              <div className="relative flex items-center justify-center">
-                <ShoppingBag className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-slate-900 group-hover:scale-105 transition-transform" />
+              <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-[6px] bg-[#F37022]/10 group-hover:bg-[#F37022] text-[#F37022] group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+                <ShoppingCart className="w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform group-hover:scale-105" />
                 {totalCartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-slate-950 text-[#FDD305] text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#F37022] group-hover:bg-slate-900 text-white text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs border-2 border-white">
                     {totalCartCount}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold tracking-tight mt-0.5 whitespace-nowrap overflow-visible">Cart</span>
-            </button>
-
-            {/* 3. Profile */}
-            <button 
-              type="button"
-              onClick={() => setIsProfileOpen(true)}
-              className="flex flex-col items-center justify-center text-slate-900 hover:text-black transition-colors cursor-pointer group py-0.5 min-w-[44px] sm:min-w-[50px] shrink-0"
-              title="Profile & Menu"
-            >
-              <div className="relative flex items-center justify-center">
-                <User className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-slate-900 group-hover:scale-105 transition-transform" />
+              <div className="flex flex-col text-left leading-none">
+                <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-400">Total</span>
+                <span className="text-xs sm:text-sm font-black text-[#F37022] whitespace-nowrap mt-0.5">
+                  ৳{(cartSubtotal || 0).toLocaleString()}
+                </span>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold tracking-tight mt-0.5 whitespace-nowrap overflow-visible">Profile</span>
             </button>
           </div>
 
         </div>
 
-        {/* Dynamic Category Row from Admin Panel */}
-        {headerCategories.length > 0 && (
-          <div className="border-t border-amber-300/80 bg-[#f5cb05]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <nav className="flex items-center gap-4 sm:gap-6 md:gap-7 overflow-x-auto no-scrollbar py-2 text-xs sm:text-sm font-semibold whitespace-nowrap text-slate-900">
-                {headerCategories.map((catName) => {
-                  const isSelected = selectedCategoryCheckbox.toLowerCase() === catName.toLowerCase();
-                  return (
-                    <button
-                      key={catName}
-                      type="button"
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedCategoryCheckbox('All');
-                        } else {
-                          setSelectedCategoryCheckbox(catName);
-                        }
-                        setCurrentPage(1);
-                        if (activeNav !== 'shop') {
-                          navigateTo('shop');
-                        }
-                        setTimeout(() => {
-                          window.scrollTo({ top: 380, behavior: 'smooth' });
-                        }, 150);
-                      }}
-                      className={`transition-colors cursor-pointer pb-0.5 ${
-                        isSelected
-                          ? 'text-black font-black border-b-2 border-slate-950'
-                          : 'text-slate-900 hover:text-black'
-                      }`}
-                    >
-                      {catName}
-                    </button>
-                  );
-                })}
-              </nav>
+        {/* Dynamic Cartup Style Category Sub-Header */}
+        <div className="border-t border-slate-100 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+            
+            {/* Left: "All Categories" Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategoryCheckbox('All');
+                setCurrentPage(1);
+                if (activeNav !== 'shop') navigateTo('shop');
+              }}
+              className="flex items-center gap-2 py-2.5 px-3 -ml-2 text-xs sm:text-[13px] font-bold text-slate-900 hover:text-[#F37022] transition-colors cursor-pointer shrink-0"
+            >
+              <LayoutGrid className="w-4 h-4 text-slate-700" />
+              <span>All Categories</span>
+            </button>
+
+            {/* Center Category Icons Row */}
+            <nav className="flex items-center gap-5 sm:gap-7 overflow-x-auto no-scrollbar py-2 text-xs sm:text-[13px] font-medium whitespace-nowrap text-slate-700 flex-1">
+              {headerCategories.map((catName) => {
+                const isSelected = selectedCategoryCheckbox.toLowerCase() === catName.toLowerCase();
+                return (
+                  <button
+                    key={catName}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedCategoryCheckbox('All');
+                      } else {
+                        setSelectedCategoryCheckbox(catName);
+                      }
+                      setCurrentPage(1);
+                      if (activeNav !== 'shop') {
+                        navigateTo('shop');
+                      }
+                      setTimeout(() => {
+                        window.scrollTo({ top: 380, behavior: 'smooth' });
+                      }, 150);
+                    }}
+                    className={`flex items-center gap-1.5 transition-colors cursor-pointer py-1 ${
+                      isSelected
+                        ? 'text-[#F37022] font-bold border-b-2 border-[#F37022]'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Tag className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{catName}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Right: Arrow Buttons < > */}
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0 pl-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nav = document.querySelector('header nav');
+                  if (nav) nav.scrollBy({ left: -200, behavior: 'smooth' });
+                }}
+                className="w-6 h-6 rounded-full border border-slate-200 text-[#F37022] hover:bg-orange-50 flex items-center justify-center transition-colors cursor-pointer"
+                title="Scroll Left"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nav = document.querySelector('header nav');
+                  if (nav) nav.scrollBy({ left: 200, behavior: 'smooth' });
+                }}
+                className="w-6 h-6 rounded-full border border-slate-200 text-[#F37022] hover:bg-orange-50 flex items-center justify-center transition-colors cursor-pointer"
+                title="Scroll Right"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
+
           </div>
-        )}
+        </div>
       </header>
 
 
@@ -1954,8 +2143,8 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       onClick={() => setActiveImageIndex(idx)}
                       className={`w-16 h-16 sm:w-20 sm:h-20 md:w-full md:h-20 lg:h-24 rounded-lg bg-white border-2 ${
                         activeImageIndex === idx 
-                          ? 'border-[#FDD305] ring-2 ring-amber-400 shadow-sm' 
-                          : 'border-slate-200 hover:border-amber-400'
+                          ? 'border-slate-900 ring-2 ring-slate-900/20 shadow-sm' 
+                          : 'border-slate-200 hover:border-slate-400'
                       } p-1.5 overflow-hidden transition-all shrink-0 cursor-pointer flex items-center justify-center`}
                       aria-label={`View product image ${idx + 1}`}
                     >
@@ -2063,25 +2252,22 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 `হ্যালো, আমি এই পণ্যটি অর্ডার করতে চাই:\n• পণ্য: ${activeProductDetail.title}${currentVariant ? `\n• ভেরিয়েন্ট: ${currentVariant.name}` : ''}\n• পরিমাণ: ${detailQuantity}\n• সর্বমোট: ${formatPrice(effectivePrice * detailQuantity)}\nঅনুগ্রহ করে আমার ডেলিভারি কনফার্ম করুন।`
               );
 
-              // Extract package contents / highlights
-              const bulletSource = activeProductDetail.benefitsHighlights || activeProductDetail.description || '';
-              const parsedBullets = bulletSource
-                .split('\n')
-                .map(line => line.trim().replace(/^[•\-\*]\s*/, ''))
-                .filter(line => line.length > 2);
+              // Single primary description text (deduplicated)
+              const cleanDescription = (
+                activeProductDetail.description || 
+                activeProductDetail.benefitsHighlights || 
+                '১০০% অরিজিনাল ও গুণগত মানসম্পন্ন প্রোডাক্ট। সরাসরি চায়না থেকে আমদানিকৃত ট্রেন্ডি গ্যাজেট ও লাইফস্টাইল পণ্য।'
+              ).trim();
 
-              const packageItems = parsedBullets.length > 0 ? parsedBullets : [
-                '১০০% খাঁটি ও গুণগত মানের উপাদান',
-                'ন্যাচারাল উপায়ে সংগৃহীত ও প্রক্রিয়াজাত',
-                'কোনো কৃত্রিম রং বা প্রিজারভেটিভ নেই',
-                'নিরাপদ ও স্বাস্থ্যসম্মত ফুড-গ্রেড প্যাকেজিং'
-              ];
+              // Distinct How-to-use (rendered only if genuinely different from description)
+              const rawHowToUse = (activeProductDetail.howToUse || (activeProductDetail as any).howToUseIt || '').trim();
+              const distinctHowToUse = (rawHowToUse && rawHowToUse !== cleanDescription) ? rawHowToUse : null;
 
               return (
                 <div className="lg:col-span-6 space-y-4 sm:space-y-5">
                   {/* Category / Series Tag */}
                   {activeProductDetail.series && (
-                    <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 text-[11px] font-bold uppercase tracking-wider rounded-md border border-emerald-200">
+                    <span className="inline-block px-2.5 py-1 bg-orange-50 text-[#F37022] text-[11px] font-bold uppercase tracking-wider rounded-[6px] border border-orange-200">
                       {activeProductDetail.series}
                     </span>
                   )}
@@ -2091,25 +2277,18 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     {activeProductDetail.title}
                   </h1>
 
-                  {/* Package List: "প্যাকে যা যা থাকছে:" (Pahariya Screenshot 1) */}
-                  <div className="bg-[#fffdf7] border border-amber-200/90 rounded-xl p-3.5 sm:p-4 space-y-2">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-amber-500" />
-                      <span>প্যাকে যা যা থাকছে:</span>
-                    </h3>
-                    <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700">
-                      {packageItems.slice(0, 6).map((item, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="text-amber-500 font-bold shrink-0 mt-0.5">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  {/* Optional Short Subtitle (Only if genuinely distinct from description and title) */}
+                  {activeProductDetail.subtitle && 
+                   activeProductDetail.subtitle.trim() !== activeProductDetail.title.trim() &&
+                   activeProductDetail.subtitle.trim() !== cleanDescription && (
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                      {activeProductDetail.subtitle}
+                    </p>
+                  )}
 
                   {/* Price Row: Bold Dark Current Price + Strikethrough Regular Price */}
                   <div className="flex flex-wrap items-baseline gap-3 py-1">
-                    <span className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
                       {formatPrice(effectivePrice)}
                     </span>
                     {effectiveRegularPrice && effectiveRegularPrice > effectivePrice && (
@@ -2118,7 +2297,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       </span>
                     )}
                     {effectiveDiscount && (
-                      <span className="text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded">
+                      <span className="text-xs bg-orange-100 text-[#F37022] font-bold px-2 py-0.5 rounded-[4px]">
                         {effectiveDiscount}% OFF
                       </span>
                     )}
@@ -2129,10 +2308,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     <div className="space-y-2.5 pt-2 border-t border-slate-100">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-slate-800">
-                          ওজন / সাইজ বাছাই করুন: {currentVariant && <span className="text-amber-700 font-bold">{currentVariant.name}</span>}
+                          সাইজ বা ভ্যারিয়েন্ট বাছাই করুন: {currentVariant && <span className="text-[#F37022] font-bold">{currentVariant.name}</span>}
                         </label>
                         {currentVariant?.price ? (
-                          <span className="text-xs font-bold text-slate-950 bg-amber-100/90 px-2.5 py-0.5 rounded-full border border-amber-300">
+                          <span className="text-xs font-bold text-slate-950 bg-amber-100/90 px-2.5 py-0.5 rounded-[4px] border border-amber-300">
                             {formatPrice(currentVariant.price)}
                           </span>
                         ) : null}
@@ -2145,16 +2324,16 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                               key={v.id}
                               type="button"
                               onClick={() => setSelectedVariant(v)}
-                              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
+                              className={`px-3.5 py-2 rounded-[6px] text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
                                 isSelected
-                                  ? 'bg-[#FDD305] text-slate-950 border-[#FDD305] shadow-sm ring-2 ring-amber-400 font-bold'
-                                  : 'bg-white text-slate-800 border-slate-300 hover:border-amber-400 hover:bg-slate-50'
+                                  ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs ring-1 ring-[#F37022] font-bold'
+                                  : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                               }`}
                             >
                               <span>{v.name}</span>
                               {v.price > 0 && (
-                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                                  isSelected ? 'bg-amber-400/40 text-slate-950 font-bold' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-[4px] ${
+                                  isSelected ? 'bg-orange-100 text-[#F37022] font-bold' : 'bg-slate-100 text-slate-700 border border-slate-200'
                                 }`}>
                                   {formatPrice(v.price)}
                                 </span>
@@ -2168,8 +2347,8 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
                   {/* Quantity Stepper: [-] 1 [+] */}
                   <div className="flex items-center gap-3 pt-1">
-                    <span className="text-xs font-bold text-slate-700">পরিমাণ:</span>
-                    <div className="inline-flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-xs">
+                    <span className="text-xs font-bold text-slate-700">Quantity:</span>
+                    <div className="inline-flex items-center border border-slate-300 rounded-[6px] overflow-hidden bg-white shadow-2xs">
                       <button
                         type="button"
                         onClick={() => setDetailQuantity(prev => Math.max(1, prev - 1))}
@@ -2192,57 +2371,80 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     </div>
                   </div>
 
-                  {/* Action Buttons: Buy Now & Order on WhatsApp Only */}
+                  {/* Action Buttons: Add to Cart & Buy Now */}
                   <div className="space-y-3 pt-2">
-                    {/* Button 1: Buy Now (Solid Vibrant Yellow Full Width) */}
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        handleAddToCart(activeProductDetail, detailQuantity, currentVariant || undefined);
-                        setIsCartOpen(false);
-                        navigateTo('checkout');
-                      }}
-                      className="w-full bg-[#FDD305] hover:bg-[#e6be02] active:scale-[0.99] text-slate-950 font-black py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span>Buy Now</span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          handleAddToCart(activeProductDetail, detailQuantity, currentVariant || undefined);
+                        }}
+                        className="w-full bg-orange-50 hover:bg-orange-100 border border-orange-200 active:scale-[0.99] text-[#F37022] font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <ShoppingBag className="w-5 h-5 text-[#F37022]" />
+                        <span>Add to Cart</span>
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          handleAddToCart(activeProductDetail, detailQuantity, currentVariant || undefined);
+                          setIsCartOpen(false);
+                          navigateTo('checkout');
+                        }}
+                        className="w-full bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-md shadow-orange-500/25 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span>Buy Now</span>
+                      </button>
+                    </div>
 
                     {/* Button 2: Order on WhatsApp (Solid Green Full Width) */}
                     <a
                       href={`https://wa.me/${whatsappNum}?text=${whatsappOrderMessage}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-full bg-[#16a34a] hover:bg-[#15803d] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full bg-[#16a34a] hover:bg-[#15803d] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
                     >
                       <MessageCircle className="w-5 h-5 fill-current" />
                       <span>Order on WhatsApp</span>
                     </a>
                   </div>
 
-                  {/* Product Description */}
-                  <div className="space-y-1.5 pt-4 border-t border-slate-100">
-                    <h3 className="text-sm font-bold text-slate-900">Product Description / পণ্যের বিবরণ:</h3>
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-light text-justify whitespace-pre-line">
-                      {activeProductDetail.description || activeProductDetail.benefitsHighlights || '১০০% খাঁটি ও গুণগত মানসম্পন্ন খাদ্য ও প্রাকৃতিক পণ্য।'}
-                    </p>
+                  {/* Authentic Guarantee Badge */}
+                  <div className="p-3 bg-orange-50/70 rounded-[6px] border border-orange-200/80 flex items-center gap-3">
+                    <ShieldCheck className="w-5 h-5 text-[#F37022] shrink-0" />
+                    <span className="text-xs text-slate-800 font-medium">
+                      ১০০% অরিজিনাল কোয়ালিটি ও ফাস্ট ডেলিভারির নিশ্চয়তা। সারা দেশে ক্যাশ অন ডেলিভারি সুবিধা।
+                    </span>
                   </div>
 
-                  {/* How to use / Benefits */}
-                  {(activeProductDetail.howToUse || activeProductDetail.benefitsHighlights) && (
-                    <div className="space-y-1.5 pt-2">
-                      <h3 className="text-sm font-bold text-slate-900">ব্যবহার বিধি / উপকারিতা:</h3>
-                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-light text-justify whitespace-pre-line">
-                        {activeProductDetail.howToUse || activeProductDetail.benefitsHighlights}
-                      </p>
+                  {/* Single Clean Professional Product Description (Zero Duplication) */}
+                  <div className="bg-white rounded-[6px] border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
+                      <div className="w-7 h-7 rounded-[6px] bg-[#F37022]/10 text-[#F37022] flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                        Product Description / পণ্যের বিবরণ
+                      </h2>
                     </div>
-                  )}
 
-                  {/* Purity Guarantee Badge */}
-                  <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200/80 flex items-center gap-3">
-                    <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
-                    <span className="text-xs text-emerald-900 font-medium">
-                      ন্যাচারাল ও ল্যাব টেস্টে শতভাগ বিশুদ্ধতার নিশ্চয়তা। সারা দেশে ক্যাশ অন ডেলিভারি সুবিধা।
-                    </span>
+                    <div className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal whitespace-pre-line text-justify">
+                      {cleanDescription}
+                    </div>
+
+                    {/* Genuine Usage Instructions (Rendered ONLY if completely distinct) */}
+                    {distinctHowToUse && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <h3 className="text-xs font-bold text-slate-900 mb-1 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#F37022]"></span>
+                          <span>ব্যবহার বিধি / How to Use</span>
+                        </h3>
+                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line text-justify">
+                          {distinctHowToUse}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -2283,7 +2485,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   <PahariyaProductCard
                     key={'related-' + prod.id}
                     product={prod}
-                    displayStoreLogo={displayStoreLogo}
+                    displayStoreLogo={displayStoreIcon}
                     onOpenDetail={openProductDetail}
                     onAddToCart={handleAddToCart}
                     onBuyNow={(p, variant) => {
@@ -2329,7 +2531,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   <PahariyaProductCard
                     key={'recent-' + prod.id}
                     product={prod}
-                    displayStoreLogo={displayStoreLogo}
+                    displayStoreLogo={displayStoreIcon}
                     onOpenDetail={openProductDetail}
                     onAddToCart={handleAddToCart}
                     onBuyNow={(p, variant) => {
@@ -2367,15 +2569,15 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
           
           {/* Header */}
           <div className="text-center space-y-2">
-            <span className="text-[11px] font-bold tracking-widest text-amber-800 uppercase">
-              সরাসরি যোগাযোগ
+            <span className="text-[11px] font-bold tracking-widest text-[#F37022] uppercase">
+              Direct Contact
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              যোগাযোগ করুন
+              Contact Us
             </h2>
-            <div className="w-12 h-1 bg-[#FDD305] mx-auto rounded-full"></div>
+            <div className="w-12 h-1 bg-[#F37022] mx-auto rounded-full"></div>
             <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto pt-1 font-medium">
-              যেকোনো পণ্য, অর্ডার বা তথ্যের জন্য আমাদের সাথে সরাসরি যোগাযোগ করুন।
+              For any queries, orders or support, reach out to our team directly.
             </p>
           </div>
 
@@ -2383,78 +2585,78 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             
             {/* Phone / Hotline */}
-            <div className="bg-white rounded-[8px] p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-amber-100 text-slate-900 border border-amber-300 flex items-center justify-center">
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-900 border border-slate-200 flex items-center justify-center">
                 <Phone className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">হটলাইন / কল</h3>
-                <p className="text-xs text-slate-600 font-semibold">{displayPhone || 'কল করুন'}</p>
+                <h3 className="text-sm font-bold text-slate-900">Hotline</h3>
+                <p className="text-xs text-slate-600 font-semibold">{displayPhone || '+8809613444455'}</p>
               </div>
               {displayPhone && (
                 <a 
                   href={`tel:${displayPhone.replace(/[^\d+]/g, '')}`}
-                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline"
+                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-[#F37022] hover:text-[#d95c10] hover:underline"
                 >
-                  <span>সরাসরি কল করুন</span>
+                  <span>Call Now</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </a>
               )}
             </div>
 
             {/* WhatsApp */}
-            <div className="bg-white rounded-[8px] p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-amber-100 text-slate-900 border border-amber-300 flex items-center justify-center">
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">হোয়াটসঅ্যাপ</h3>
-                <p className="text-xs text-slate-600 font-semibold">{ecomSettings?.whatsappNumber || socialLinks?.whatsapp || displayPhone || 'চ্যাট করুন'}</p>
+                <h3 className="text-sm font-bold text-slate-900">WhatsApp</h3>
+                <p className="text-xs text-slate-600 font-semibold">{ecomSettings?.whatsappNumber || socialLinks?.whatsapp || displayPhone || 'Chat'}</p>
               </div>
               {(ecomSettings?.whatsappNumber || socialLinks?.whatsapp || displayPhone) && (
                 <a 
                   href={`https://wa.me/${(ecomSettings?.whatsappNumber || socialLinks?.whatsapp || displayPhone || '').replace(/[^\d]/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline"
+                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                 >
-                  <span>চ্যাট করুন</span>
+                  <span>Chat on WhatsApp</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </a>
               )}
             </div>
 
             {/* Email */}
-            <div className="bg-white rounded-[8px] p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-amber-100 text-slate-900 border border-amber-300 flex items-center justify-center">
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-900 border border-slate-200 flex items-center justify-center">
                 <Mail className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">ইমেইল</h3>
-                <p className="text-xs text-slate-600 font-semibold truncate max-w-[200px]">{displayEmail || 'ইমেইল করুন'}</p>
+                <h3 className="text-sm font-bold text-slate-900">Email</h3>
+                <p className="text-xs text-slate-600 font-semibold truncate max-w-[200px]">{displayEmail || 'customer.care@ettadimart.com'}</p>
               </div>
               {displayEmail && (
                 <a 
                   href={`mailto:${displayEmail}`}
-                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline"
+                  className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold text-[#F37022] hover:text-[#d95c10] hover:underline"
                 >
-                  <span>ইমেইল পাঠান</span>
+                  <span>Send Email</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </a>
               )}
             </div>
 
             {/* Office Address */}
-            <div className="bg-white rounded-[8px] p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-amber-100 text-slate-900 border border-amber-300 flex items-center justify-center">
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-900 border border-slate-200 flex items-center justify-center">
                 <MapPin className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">অফিস / ঠিকানা</h3>
-                <p className="text-xs text-slate-600 font-medium line-clamp-2">{displayAddress || 'ঢাকা, বাংলাদেশ'}</p>
+                <h3 className="text-sm font-bold text-slate-900">Office Address</h3>
+                <p className="text-xs text-slate-600 font-medium line-clamp-2">{displayAddress || 'Rahman Regnum Centre, Level-6, Tejgaon C/A, Dhaka-1208'}</p>
               </div>
               <span className="mt-auto text-[11px] font-semibold text-slate-400">
-                সরাসরি ভিজিট করুন
+                Visit Us
               </span>
             </div>
 
@@ -2464,10 +2666,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
           <div className="text-center pt-4">
             <button
               onClick={() => navigateTo('home')}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[4px] bg-[#FDD305] hover:bg-[#e6be02] text-slate-950 text-xs font-bold transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 px-8 py-2.5 rounded-[6px] bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-xs cursor-pointer"
             >
-              <span>কেনাকাটা চালিয়ে যান</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
+              <span>Continue Shopping</span>
+              <ArrowRight className="w-3.5 h-3.5 text-white" />
             </button>
           </div>
 
@@ -2483,7 +2685,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
             
             <div className="lg:col-span-3 space-y-6">
-              <div className="bg-white p-5 sm:p-6 border border-slate-200/80 shadow-xs">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
                 <h2 className="font-serif text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 pb-2 border-b border-slate-100">
                   Shop Categories
                 </h2>
@@ -2502,7 +2704,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                             setSelectedCategoryCheckbox(cat);
                             setCurrentPage(1);
                           }}
-                          className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 cursor-pointer"
+                          className="w-4 h-4 rounded text-[#F37022] focus:ring-[#F37022] border-slate-300 cursor-pointer"
                         />
                         <span className="truncate">{cat}</span>
                       </label>
@@ -2514,7 +2716,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
               </div>
 
               {shopBrands.length > 1 && (
-                <div className="bg-white p-5 sm:p-6 border border-slate-200/80 shadow-xs">
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
                   <h2 className="font-serif text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 pb-2 border-b border-slate-100">
                     Brands
                   </h2>
@@ -2532,7 +2734,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                             setSelectedBrand(brand);
                             setCurrentPage(1);
                           }}
-                          className="w-4 h-4 text-slate-900 focus:ring-slate-900 border-slate-300 cursor-pointer"
+                          className="w-4 h-4 text-[#F37022] focus:ring-[#F37022] border-slate-300 cursor-pointer"
                         />
                         <span className="truncate">{brand}</span>
                       </label>
@@ -2541,7 +2743,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 </div>
               )}
 
-              <div className="bg-white p-5 sm:p-6 border border-slate-200/80 shadow-xs">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
                 <h2 className="font-serif text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 pb-2 border-b border-slate-100">
                   Filter by Price
                 </h2>
@@ -2560,7 +2762,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       setPriceRange(Number(e.target.value));
                       setCurrentPage(1);
                     }}
-                    className="w-full accent-slate-900 cursor-pointer"
+                    className="w-full accent-[#F37022] cursor-pointer"
                   />
                 </div>
               </div>
@@ -2569,7 +2771,13 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             <div className="lg:col-span-9 space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="text-xs text-slate-500 font-medium">
-                  Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredCatalog.length)} of {filteredCatalog.length} products (Page {currentPage})
+                  {filteredCatalog.length === 0 ? (
+                    <span>0 products found</span>
+                  ) : (
+                    <span>
+                      Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredCatalog.length)} of {filteredCatalog.length} products (Page {currentPage} of {totalPages})
+                    </span>
+                  )}
                   {searchTerm && <span className="text-slate-800 font-semibold ml-1">for &quot;{searchTerm}&quot;</span>}
                 </div>
 
@@ -2578,7 +2786,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   <select 
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="bg-white border border-slate-200 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-800 rounded-none focus:outline-none cursor-pointer"
+                    className="bg-white border border-slate-200 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-800 rounded-xl focus:outline-none cursor-pointer"
                   >
                     <option value="featured">Featured</option>
                     <option value="price-asc">Price: Low to High</option>
@@ -2594,7 +2802,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     <PahariyaProductCard
                       key={product.id}
                       product={product}
-                      displayStoreLogo={displayStoreLogo}
+                      displayStoreLogo={displayStoreIcon}
                       onOpenDetail={openProductDetail}
                       onAddToCart={handleAddToCart}
                       onBuyNow={(prod, variant) => {
@@ -2642,47 +2850,49 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 </div>
               )}
 
-              <div className="flex items-center justify-center gap-3 pt-8 text-xs text-slate-600 font-medium">
-                <button 
-                  onClick={() => setCurrentPage(1)} 
-                  disabled={currentPage === 1}
-                  className="hover:text-slate-950 disabled:opacity-40"
-                >
-                  ← First
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
-                  disabled={currentPage === 1}
-                  className="hover:text-slate-950 disabled:opacity-40"
-                >
-                  &lt; Previous
-                </button>
-
-                {[...Array(totalPages)].map((_, i) => (
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 pt-8 text-xs text-slate-600 font-medium">
                   <button 
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-6 h-6 flex items-center justify-center ${currentPage === i + 1 ? 'font-bold text-slate-950 border-b border-slate-950' : 'hover:text-slate-950'}`}
+                    onClick={() => setCurrentPage(1)} 
+                    disabled={currentPage === 1}
+                    className="hover:text-slate-950 disabled:opacity-40"
                   >
-                    {i + 1}
+                    ← First
                   </button>
-                ))}
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                    disabled={currentPage === 1}
+                    className="hover:text-slate-950 disabled:opacity-40"
+                  >
+                    &lt; Previous
+                  </button>
 
-                <button 
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
-                  disabled={currentPage === totalPages}
-                  className="hover:text-slate-950 disabled:opacity-40"
-                >
-                  Next &gt;
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(totalPages)} 
-                  disabled={currentPage === totalPages}
-                  className="hover:text-slate-950 disabled:opacity-40"
-                >
-                  Last →
-                </button>
-              </div>
+                  {[...Array(totalPages)].map((_, i) => (
+                    <button 
+                      key={i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`w-6 h-6 flex items-center justify-center ${currentPage === i + 1 ? 'font-bold text-slate-950 border-b border-slate-950' : 'hover:text-slate-950'}`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                    disabled={currentPage === totalPages}
+                    className="hover:text-slate-950 disabled:opacity-40"
+                  >
+                    Next &gt;
+                  </button>
+                  <button 
+                    onClick={() => setCurrentPage(totalPages)} 
+                    disabled={currentPage === totalPages}
+                    className="hover:text-slate-950 disabled:opacity-40"
+                  >
+                    Last →
+                  </button>
+                </div>
+              )}
 
 
 
@@ -2714,8 +2924,8 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             </div>
 
             <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 text-center space-y-4">
-              <div className="inline-flex items-center gap-2 bg-[#FDD305]/20 text-[#FDD305] border border-[#FDD305]/30 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest backdrop-blur-xs">
-                <Sparkles className="w-3.5 h-3.5 text-[#FDD305]" />
+              <div className="inline-flex items-center gap-2 bg-orange-500/20 text-orange-300 border border-orange-500/30 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest backdrop-blur-xs">
+                <Sparkles className="w-3.5 h-3.5 text-[#F37022]" />
                 {aboutSettings.badge || 'ABOUT OUR BRAND'}
               </div>
 
@@ -2780,7 +2990,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
           onCancel={() => navigateTo('home')}
           isWishlisted={(productId) => false}
           onToggleWishlist={() => {}}
-          onOpenDetail={(product) => openProductDetail(product)}
+          onOpenDetail={(product) => openProductDetail(product as any)}
         />
       )}
 
@@ -2806,7 +3016,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 <div className="max-w-7xl mx-auto px-4 sm:px-8">
                   {/* Primary SEO Brand Heading for Search Engines */}
                   <h1 className="sr-only">
-                    {displayStoreName} - COMFORT TO WELLNESS | স্বস্তির বাজার Official Online Store
+                    {displayStoreName} - China Imported Varieties | ইত্যাদি মার্ট Official Online Store
                   </h1>
                   
                   {/* DUAL PROMO BANNER GRID (Naturo Style: Left Wide 8 Cols, Right Square 4 Cols ~1:1) */}
@@ -2820,7 +3030,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                               if (leftLink.startsWith('http')) window.open(leftLink, '_blank');
                               else navigateTo('shop');
                             }}
-                            className="w-full relative rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 group bg-[#163e2b] h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px] cursor-pointer"
+                            className="w-full relative rounded-[6px] overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 group bg-slate-900 h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px] cursor-pointer"
                           >
                             <img 
                               src={leftImage} 
@@ -2864,9 +3074,9 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                             </div>
                           </div>
                         ) : (
-                          <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-900 to-emerald-950 text-white p-8 flex flex-col justify-center items-center text-center h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px]">
+                          <div className="w-full rounded-[6px] bg-gradient-to-br from-slate-900 to-slate-950 text-white p-8 flex flex-col justify-center items-center text-center h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px]">
                             <h3 className="text-xl sm:text-2xl font-bold mb-2">{displayStoreName}</h3>
-                            <p className="text-xs sm:text-sm text-emerald-200">100% Pure, Organic & Lab-Tested Quality</p>
+                            <p className="text-xs sm:text-sm text-slate-300">China Direct Imported Varieties, Smart Gadgets & Lifestyle</p>
                           </div>
                         )}
                       </div>
@@ -2879,7 +3089,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                               if (rightLink.startsWith('http')) window.open(rightLink, '_blank');
                               else navigateTo('shop');
                             }}
-                            className="w-full relative rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 cursor-pointer group bg-[#163e2b] h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px]"
+                            className="w-full relative rounded-[6px] overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 cursor-pointer group bg-slate-900 h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px]"
                           >
                             <img 
                               src={rightImage} 
@@ -2891,153 +3101,196 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                               }}
                             />
                             {/* Promotional Ribbon / Tag */}
-                            <div className="absolute top-3 right-3 bg-[#e53935] text-white text-[10px] font-bold px-2.5 py-1 rounded-[4px] shadow-md uppercase tracking-wider">
+                            <div className="absolute top-3 right-3 bg-[#F37022] text-white text-[10px] font-bold px-2.5 py-1 rounded-[4px] shadow-md uppercase tracking-wider">
                               Special Offer
                             </div>
                           </div>
                         ) : (
-                          <div className="w-full rounded-2xl bg-gradient-to-br from-[#FDD305] to-[#f59e0b] text-slate-950 p-8 flex flex-col justify-center items-center text-center h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px] border border-amber-300 shadow-sm">
-                            <h3 className="text-lg sm:text-xl font-black mb-2">Fast Nationwide Delivery</h3>
-                            <p className="text-xs sm:text-sm text-slate-900 font-medium">Cash on delivery available across Bangladesh</p>
+                          <div className="w-full rounded-[6px] bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 flex flex-col justify-center items-center text-center h-[240px] sm:h-[320px] md:h-[380px] lg:h-[420px] border border-slate-700 shadow-sm">
+                            <h3 className="text-lg sm:text-xl font-bold mb-2">Fast Nationwide Delivery</h3>
+                            <p className="text-xs sm:text-sm text-slate-300 font-medium">Cash on delivery available across Bangladesh</p>
                           </div>
                         )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="bg-white rounded-[6px] border border-dashed border-emerald-300/80 p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-xs space-y-3">
-                      <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center mx-auto">
-                        <Package className="w-7 h-7" />
+                  ) : null}
+
+                  {/* Posh Website Marquee Ticker */}
+                  <div className="mt-4 sm:mt-5 bg-white rounded-[6px] border border-slate-100 shadow-2xs py-2.5 sm:py-3 px-3 sm:px-4 overflow-hidden flex items-center select-none">
+                    {/* Scrolling Ticker Track */}
+                    <div className="flex-1 overflow-hidden relative">
+                      <div className="animate-marquee items-center gap-8 text-xs sm:text-[13px] text-slate-700 font-medium">
+                        {/* Set 1 */}
+                        <span className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">ETTADI MART:</span>
+                          <span>China Direct Import Varieties, Gadgets & Lifestyle Products at Unbeatable Prices.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
+                          <span className="font-semibold text-slate-800">100% Quality Checked</span>
+                          <span>& Authentic Guaranteed.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Truck className="w-4 h-4 text-blue-600 inline" />
+                          <span>Fast Cash on Delivery (COD) Available Nationwide Across Bangladesh.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5 text-[#F37022] font-bold">
+                          <Tag className="w-3.5 h-3.5 inline" />
+                          <span>Special Promo: Buy Any 3 Products & Get Free Delivery!</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-600 inline" />
+                          <span>Customer Care Hotline: +8809613444455 (9 AM – 9 PM Everyday)</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <span>⭐ 10,000+ Happy Customers Trust Ettadi Mart</span>
+                        </span>
+                        <span className="text-slate-300 mr-8">•</span>
+
+                        {/* Set 2 (Duplicate for smooth infinite scroll) */}
+                        <span className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">ETTADI MART:</span>
+                          <span>China Direct Import Varieties, Gadgets & Lifestyle Products at Unbeatable Prices.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
+                          <span className="font-semibold text-slate-800">100% Quality Checked</span>
+                          <span>& Authentic Guaranteed.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Truck className="w-4 h-4 text-blue-600 inline" />
+                          <span>Fast Cash on Delivery (COD) Available Nationwide Across Bangladesh.</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5 text-[#F37022] font-bold">
+                          <Tag className="w-3.5 h-3.5 inline" />
+                          <span>Special Promo: Buy Any 3 Products & Get Free Delivery!</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-600 inline" />
+                          <span>Customer Care Hotline: +8809613444455 (9 AM – 9 PM Everyday)</span>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <span>⭐ 10,000+ Happy Customers Trust Ettadi Mart</span>
+                        </span>
+                        <span className="text-slate-300 mr-8">•</span>
                       </div>
-                      <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
-                        {displayStoreName}
-                      </h2>
-                      <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                        No promotional banners set up yet. Upload your dual promotional banners in Admin Panel → Store Settings.
-                      </p>
-                      <button 
-                        onClick={() => navigateTo('shop')}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#134633] hover:bg-[#0e3829] text-white text-xs font-bold rounded-full transition-colors cursor-pointer shadow-sm"
-                      >
-                        Explore Catalog →
-                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </section>
             );
           })()}
 
           {/* ============================================================
-              TOP CATEGORIES SECTION ("সেরা ক্যাটাগরি" Carousel)
+              RECOMMENDED CATEGORIES (Cartup Circular Showcase)
               ============================================================ */}
           {displayCategories.length > 0 && (
-            <section className="bg-white py-8 sm:py-12 border-b border-slate-100">
+            <section className="bg-white py-8 sm:py-10 border-b border-slate-100">
               <div className="max-w-7xl mx-auto px-4 sm:px-8">
-                {/* Section Title */}
-                <div className="text-center mb-6 sm:mb-8">
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl text-slate-900 font-bold tracking-tight">
-                    সেরা ক্যাটাগরি
+                {/* Section Header with Left Title and Right Arrows */}
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Recommended Categories
                   </h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => scrollCategories('left')}
+                      className="w-8 h-8 rounded-full border border-slate-200 text-slate-600 hover:text-[#F37022] hover:border-orange-200 hover:bg-orange-50/50 flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      aria-label="Previous Categories"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollCategories('right')}
+                      className="w-8 h-8 rounded-full border border-slate-200 text-slate-600 hover:text-[#F37022] hover:border-orange-200 hover:bg-orange-50/50 flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      aria-label="Next Categories"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Carousel Container - Exact same left/right alignment as banner */}
-                <div className="relative group/carousel">
-                  {/* Left Scroll Arrow */}
-                  <button
-                    type="button"
-                    onClick={() => scrollCategories('left')}
-                    className="absolute -left-3 sm:-left-4 md:-left-5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-slate-200 text-slate-700 shadow-md flex items-center justify-center hover:bg-slate-50 transition-all z-10 cursor-pointer active:scale-95"
-                    aria-label="Previous Categories"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-
-                  {/* Horizontal Scroll Cards / Responsive 6-col Desktop Grid */}
-                  <div
-                    ref={categoryScrollRef}
-                    className="flex lg:grid lg:grid-cols-6 items-stretch gap-3 sm:gap-4 md:gap-5 overflow-x-auto lg:overflow-visible scrollbar-none scroll-smooth pb-2 lg:pb-0"
-                  >
-                    {displayCategories.map((cat) => (
-                      <div
-                        key={cat.id || cat.name}
-                        onClick={() => {
-                          setSelectedCategoryCheckbox((cat as any).targetCategory || cat.name);
-                          navigateTo('shop');
-                        }}
-                        className="w-[140px] sm:w-[160px] lg:w-full shrink-0 bg-white border-[1.5px] border-[#1e2d3d] rounded-[6px] overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col group select-none"
-                      >
-                        {/* Top Category Image with white inner frame */}
-                        <div className="p-2 sm:p-2.5 pb-2">
-                          <div className="w-full aspect-square rounded-[4px] border border-slate-200 overflow-hidden bg-[#faeedd] flex items-center justify-center">
-                            <img
-                              src={cat.image}
-                              alt={cat.name}
-                              loading="lazy"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Bottom Category Label */}
-                        <div className="bg-white py-2.5 px-2 border-t-[1.5px] border-[#1e2d3d] text-center flex items-center justify-center min-h-[42px]">
-                          <span className="text-xs sm:text-sm lg:text-[15px] font-bold text-slate-900 line-clamp-1">
-                            {cat.name}
-                          </span>
+                {/* Horizontal Scroll Circular Cards */}
+                <div
+                  ref={categoryScrollRef}
+                  className="flex items-start gap-4 sm:gap-6 lg:gap-8 overflow-x-auto scrollbar-none scroll-smooth pb-3"
+                >
+                  {displayCategories.map((cat, idx) => (
+                    <div
+                      key={cat.id || idx}
+                      onClick={() => {
+                        setSelectedCategoryCheckbox(cat.name);
+                        setCurrentPage(1);
+                        navigateTo('shop');
+                      }}
+                      className="flex flex-col items-center shrink-0 w-24 sm:w-28 md:w-32 cursor-pointer group select-none"
+                    >
+                      {/* Circular Avatar */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden bg-slate-50 border border-slate-200/80 shadow-2xs group-hover:shadow-md group-hover:scale-105 group-hover:border-[#F37022] transition-all duration-300 flex items-center justify-center">
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover rounded-full transition-transform duration-300 group-hover:scale-110"
+                            onError={(e) => {
+                              // If image fails, fallback to Tag icon
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.parentElement?.querySelector('.category-fallback-icon');
+                              if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`category-fallback-icon w-full h-full items-center justify-center bg-orange-50/60 text-[#F37022] font-bold text-lg sm:text-xl ${cat.image ? 'hidden' : 'flex'}`}
+                        >
+                          <Tag className="w-7 h-7 sm:w-8 sm:h-8 text-[#F37022]/70" />
                         </div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Right Scroll Arrow */}
-                  <button
-                    type="button"
-                    onClick={() => scrollCategories('right')}
-                    className="absolute -right-3 sm:-right-4 md:-right-5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-slate-200 text-slate-700 shadow-md flex items-center justify-center hover:bg-slate-50 transition-all z-10 cursor-pointer active:scale-95"
-                    aria-label="Next Categories"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Bottom Pagination Indicator Dots */}
-                <div className="flex items-center justify-center gap-1.5 mt-5">
-                  <span className="w-2 h-2 rounded-full bg-[#1e2d3d]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      {/* Category Label */}
+                      <span className="text-xs sm:text-[13px] font-semibold text-slate-800 text-center mt-2 group-hover:text-[#F37022] transition-colors line-clamp-1 w-full px-1">
+                        {cat.name}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
           )}
 
           {/* ============================================================
-              2. BEST SELLING PRODUCTS (NaturoBD Style)
+              DEALS YOU CAN'T MISS (Cartup Style Products Showcase)
               ============================================================ */}
-          <section className="pt-6 sm:pt-10 pb-4 sm:pb-6 bg-white border-b border-slate-100">
+          <section className="pt-8 sm:pt-10 pb-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-8">
               {products.length > 0 ? (
                 <>
-                  <div className="text-center max-w-2xl mx-auto mb-6 sm:mb-8">
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl text-slate-900 font-bold tracking-tight">
-                      পপুলার প্রোডাক্টস
+                  {/* Section Header */}
+                  <div className="mb-6">
+                    <h2 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      Deals you can't miss
                     </h2>
-                    <div className="w-16 h-1 bg-[#FDD305] mx-auto mt-2 rounded-full"></div>
-                    <p className="text-slate-600 text-xs sm:text-sm mt-1.5 font-medium">
-                      আমাদের সর্বাধিক বিক্রিত এবং গ্রাহক প্রশংসিত প্রাকৃতিক পণ্যসমূহ
-                    </p>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-                    {products.slice(0, 8).map((product) => (
+                  {/* Products Grid with Wider, Clean Product Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                    {products.slice(0, 12).map((product) => (
                       <PahariyaProductCard
                         key={product.id}
                         product={product}
-                        displayStoreLogo={displayStoreLogo}
+                        displayStoreLogo={displayStoreIcon}
                         onOpenDetail={openProductDetail}
                         onAddToCart={handleAddToCart}
                         onBuyNow={(prod, variant) => {
@@ -3050,13 +3303,13 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-center mt-5 sm:mt-6">
+                  {/* Cartup Style "Load More" Button */}
+                  <div className="flex items-center justify-center mt-8 sm:mt-10">
                     <button 
                       onClick={() => navigateTo('shop')}
-                      className="inline-flex items-center gap-2 text-slate-900 bg-white hover:bg-slate-50 px-6 py-2 rounded-full border border-slate-300 text-xs font-bold transition shadow-xs cursor-pointer"
+                      className="rounded-[6px] border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 px-8 py-2.5 text-xs sm:text-sm font-bold text-slate-800 transition-all shadow-2xs cursor-pointer active:scale-95"
                     >
-                      <span>View All Products ({products.length})</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-700" />
+                      Load More
                     </button>
                   </div>
                 </>
@@ -3074,65 +3327,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             </div>
           </section>
 
-          {/* ============================================================
-              4. DAILY RANDOM CATEGORY SHOWCASE (Changes Once Per Day)
-              ============================================================ */}
-          {dailyCategoryData && dailyCategoryData.products.length > 0 && (
-            <section className="pt-6 sm:pt-10 pb-4 sm:pb-6 bg-white border-b border-slate-100">
-              <div className="max-w-7xl mx-auto px-4 sm:px-8">
-                
-                {/* Section Header */}
-                <div className="text-center mb-6 sm:mb-8">
-                  <span className="text-[11px] font-bold tracking-widest text-slate-900 uppercase bg-amber-100 px-3 py-0.5 rounded-full border border-amber-300 inline-block mb-1.5">
-                    আজকের বিশেষ কালেকশন
-                  </span>
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl text-slate-900 font-bold tracking-tight">
-                    {dailyCategoryData.categoryName}
-                  </h2>
-                  <div className="w-16 h-1 bg-[#FDD305] mx-auto mt-2 rounded-full"></div>
-                  <p className="text-slate-600 text-xs sm:text-sm mt-1.5 font-medium">
-                    আমাদের {dailyCategoryData.categoryName} ক্যাটাগরির সেরা পণ্যসমূহ
-                  </p>
-                </div>
 
-                {/* 4 Products Grid using PahariyaProductCard */}
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-                  {dailyCategoryData.products.map((product) => (
-                    <PahariyaProductCard
-                      key={'daily-cat-' + product.id}
-                      product={product}
-                      displayStoreLogo={displayStoreLogo}
-                      onOpenDetail={openProductDetail}
-                      onAddToCart={handleAddToCart}
-                      onBuyNow={(prod, variant) => {
-                        handleAddToCart(prod, 1, variant);
-                        setIsCartOpen(false);
-                        navigateTo('checkout');
-                      }}
-                      formatPrice={formatPrice}
-                    />
-                  ))}
-                </div>
-
-                {/* View All Button (Goes to main all products page) */}
-                <div className="flex items-center justify-center mt-5 sm:mt-6">
-                  <button 
-                    onClick={() => {
-                      setSelectedCategoryCheckbox('All');
-                      setSearchTerm('');
-                      navigateTo('shop');
-                      scrollToTop();
-                    }}
-                    className="inline-flex items-center gap-2 text-slate-950 bg-[#FDD305] hover:bg-[#e6be02] active:scale-95 px-6 py-2.5 rounded-full text-xs font-bold transition shadow-xs cursor-pointer group"
-                  >
-                    <span>সব পণ্য দেখুন ({products.length})</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-slate-950" />
-                  </button>
-                </div>
-
-              </div>
-            </section>
-          )}
 
           {/* ============================================================
               6. FLASH SALE SPOTLIGHT (Clean & Simple with Variants)
@@ -3149,7 +3344,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 product={targetProd}
                 flashSaleConfig={flashSaleConfig}
                 timeLeft={flashSaleTimeLeft}
-                displayStoreLogo={displayStoreLogo}
+                displayStoreLogo={displayStoreIcon}
                 formatPrice={formatPrice}
                 onAddToCart={handleAddToCart}
                 onBuyNow={(prod, variant) => {
@@ -3168,11 +3363,12 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
       {/* ============================================================
           LUXURY FOOTER
           ============================================================ */}
-      <React.Suspense fallback={<div className="h-40 bg-[#FDD305]"></div>}>
+      <React.Suspense fallback={<div className="h-40 bg-white"></div>}>
         <FantineFooter 
           displayStoreLogo={displayStoreLogo}
           displayStoreName={displayStoreName}
           displayTagline={displayTagline}
+          displayAddress={displayAddress}
           displayEmail={displayEmail}
           displayPhone={displayPhone}
           hotlinePhone={ecomSettings?.hotlinePhone}
@@ -3223,7 +3419,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   <div className="text-center py-16 space-y-3">
                     <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
                     <div className="font-serif text-lg text-slate-600">Your bag is empty</div>
-                    <p className="text-xs text-slate-500">Discover our clinical Hanbang formulas to get started.</p>
+                    <p className="text-xs text-slate-500">Discover our China imported trending variety gadgets to get started.</p>
                     <button
                       type="button"
                       onClick={() => setIsCartOpen(false)}
@@ -3317,7 +3513,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     </div>
                     <div className="flex justify-between items-center font-serif text-sm sm:text-base font-bold text-slate-900 pt-2 border-t border-slate-100">
                       <span>Total:</span>
-                      <span className="text-[#f97316] text-lg font-black">{formatPrice(cartSubtotal)}</span>
+                      <span className="text-[#F37022] text-lg font-black">{formatPrice(cartSubtotal)}</span>
                     </div>
                   </div>
 
@@ -3346,10 +3542,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                         setIsCartOpen(false);
                         navigateTo('checkout');
                       }}
-                      className="w-full bg-[#FDD305] hover:bg-[#e6be02] active:scale-[0.99] text-slate-950 py-4 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all shadow-lg shadow-amber-400/25 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.99] text-white py-3.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span>PROCEED TO CHECKOUT</span>
-                      <ArrowRight className="w-4 h-4 text-slate-950" />
+                      <span>Proceed to Checkout</span>
+                      <ArrowRight className="w-4 h-4 text-white" />
                     </button>
                   </div>
                 </div>
@@ -3439,24 +3635,6 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
         </div>
       )}
 
-      {/* ============================================================
-          FLOATING SIDE CART WIDGET (Naturo BD Style with #FDD305 Primary)
-          ============================================================ */}
-      <button
-        type="button"
-        onClick={() => setIsCartOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-[#FDD305] hover:bg-[#e6be02] text-slate-950 rounded-l-xl px-2.5 py-3 shadow-2xl flex flex-col items-center gap-1 cursor-pointer transition-transform hover:-translate-x-1 border-l-2 border-y border-amber-400/60 select-none"
-        title="View Cart"
-        aria-label="View Cart"
-      >
-        <ShoppingBag className="w-5 h-5 text-slate-950" />
-        <span className="text-[10px] sm:text-[11px] font-bold text-slate-950 whitespace-nowrap">
-          {totalCartCount} {totalCartCount === 1 ? 'Item' : 'Items'}
-        </span>
-        <span className="text-[10px] sm:text-[11px] font-black bg-black/10 px-1.5 py-0.5 rounded text-slate-950 whitespace-nowrap">
-          ৳{cartSubtotal.toLocaleString('bn-BD')}
-        </span>
-      </button>
 
       {/* ============================================================
           ORDER TRACKING MODAL
@@ -3465,10 +3643,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
             {/* Modal Header */}
-            <div className="bg-[#FDD305] text-slate-950 px-5 py-4 flex items-center justify-between border-b border-amber-300">
+            <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-slate-800">
               <div className="flex items-center gap-2.5">
-                <Truck className="w-5 h-5 text-slate-950" />
-                <h3 className="text-base sm:text-lg font-bold text-slate-950">অর্ডার ট্র্যাকিং (Order Track)</h3>
+                <Truck className="w-5 h-5 text-white" />
+                <h3 className="text-base sm:text-lg font-bold text-white">Track Order</h3>
               </div>
               <button
                 type="button"
@@ -3478,7 +3656,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   setOrderTrackResults([]);
                   setOrderTrackSearched(false);
                 }}
-                className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -3489,27 +3667,27 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               <form onSubmit={handleSearchOrderTracking} className="space-y-3">
                 <label className="block text-xs font-semibold text-slate-700">
-                  আপনার ১১ ডিজিটের ফোন নম্বর বা অর্ডার আইডি লিখুন:
+                  Enter your 11-digit phone number or Order ID:
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={orderTrackQuery}
                     onChange={(e) => setOrderTrackQuery(e.target.value)}
-                    placeholder="যেমন: 01712345678 বা #ORD-..."
-                    className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#FDD305] focus:ring-1 focus:ring-[#FDD305]"
+                    placeholder="e.g. 01712345678 or #ORD-..."
+                    className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#F37022] focus:ring-1 focus:ring-[#F37022]"
                   />
                   <button
                     type="submit"
                     disabled={orderTrackLoading || !orderTrackQuery.trim()}
-                    className="bg-[#FDD305] hover:bg-[#e6be02] disabled:bg-slate-300 text-slate-950 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs"
+                    className="bg-[#F37022] hover:bg-[#d95c10] disabled:bg-slate-300 text-white px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs"
                   >
                     {orderTrackLoading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
                     ) : (
-                      <Search className="w-4 h-4 text-slate-950" />
+                      <Search className="w-4 h-4 text-white" />
                     )}
-                    <span>ট্র্যাক করুন</span>
+                    <span>Track</span>
                   </button>
                 </div>
               </form>
@@ -3518,7 +3696,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
               {/* Loading State */}
               {orderTrackLoading && (
                 <div className="py-8 text-center text-slate-500 text-xs flex flex-col items-center gap-2">
-                  <RefreshCw className="w-6 h-6 animate-spin text-[#163e2b]" />
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#F37022]" />
                   <span>অর্ডারের তথ্য খোঁজা হচ্ছে...</span>
                 </div>
               )}
@@ -3527,7 +3705,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
               {!orderTrackLoading && orderTrackSearched && (
                 orderTrackResults.length > 0 ? (
                   <div className="space-y-4 pt-2">
-                    <p className="text-xs font-semibold text-emerald-800">
+                    <p className="text-xs font-semibold text-slate-800">
                       {orderTrackResults.length} টি অর্ডার পাওয়া গেছে:
                     </p>
                     {orderTrackResults.map((order, idx) => {
@@ -3593,10 +3771,10 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
                           {/* Steadfast / Pathao Tracking Code */}
                           {(order.steadfastTrackingCode || order.pathaoTrackingCode) && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center justify-between">
+                            <div className="bg-orange-50/60 border border-orange-200/80 rounded-lg p-2.5 flex items-center justify-between">
                               <div>
-                                <p className="text-[11px] font-bold text-emerald-900">কুরিয়ার ট্র্যাকিং কোড:</p>
-                                <p className="text-xs font-mono font-bold text-emerald-800">
+                                <p className="text-[11px] font-bold text-slate-900">কুরিয়ার ট্র্যাকিং কোড:</p>
+                                <p className="text-xs font-mono font-bold text-[#F37022]">
                                   {order.steadfastTrackingCode || order.pathaoTrackingCode}
                                 </p>
                               </div>
@@ -3605,7 +3783,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                                   href={`https://steadfast.com.bd/tracking/${order.steadfastTrackingCode}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[11px] font-bold bg-[#163e2b] text-white px-2.5 py-1 rounded hover:bg-[#102e20] transition-colors"
+                                  className="text-[11px] font-bold bg-[#F37022] text-white px-2.5 py-1 rounded hover:bg-[#d95c10] transition-colors"
                                 >
                                   কুরিয়ার ট্র্যাক &rarr;
                                 </a>
@@ -3631,7 +3809,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                           {/* Total */}
                           <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
                             <span className="text-slate-600 font-medium">সর্বমোট মূল্য (ক্যাশ অন ডেলিভারি):</span>
-                            <span className="text-sm font-bold text-[#163e2b]">
+                            <span className="text-sm font-bold text-[#F37022]">
                               ৳{(order.totalAmount || order.total || 0).toLocaleString('bn-BD')}
                             </span>
                           </div>
@@ -3649,7 +3827,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                       <div className="pt-2">
                         <a
                           href={`tel:${displayPhone}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#163e2b] bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 hover:bg-emerald-100"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F37022] bg-orange-50 px-3 py-1.5 rounded-full border border-orange-200 hover:bg-orange-100"
                         >
                           <Phone className="w-3.5 h-3.5" />
                           <span>সাহায্যের জন্য কল করুন: {displayPhone}</span>
@@ -3670,7 +3848,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
       {isProfileOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl p-6 space-y-4 border border-slate-100 text-center">
-            <div className="w-14 h-14 bg-emerald-100 text-[#163e2b] rounded-full flex items-center justify-center mx-auto">
+            <div className="w-14 h-14 bg-orange-100 text-[#F37022] rounded-full flex items-center justify-center mx-auto">
               <User className="w-7 h-7" />
             </div>
             <div>
@@ -3685,7 +3863,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   setIsProfileOpen(false);
                   setIsOrderTrackingOpen(true);
                 }}
-                className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100/80 text-[#163e2b] rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 border border-emerald-200"
+                className="w-full py-2.5 px-4 bg-orange-50 hover:bg-orange-100/80 text-[#F37022] rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 border border-orange-200"
               >
                 <Truck className="w-4 h-4" />
                 <span>অর্ডার ট্র্যাকিং (Order Track)</span>
@@ -3696,7 +3874,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   href={`tel:${displayPhone}`}
                   className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Phone className="w-4 h-4 text-emerald-700" />
+                  <Phone className="w-4 h-4 text-[#F37022]" />
                   <span>সরাসরি কল করুন ({displayPhone})</span>
                 </a>
               )}
@@ -3709,7 +3887,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                 }}
                 className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                <ShoppingBag className="w-4 h-4 text-amber-600" />
+                <ShoppingBag className="w-4 h-4 text-[#F37022]" />
                 <span>সকল পণ্য দেখুন (Shop)</span>
               </button>
 
@@ -3730,13 +3908,407 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
             <button
               type="button"
               onClick={() => setIsProfileOpen(false)}
-              className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+              className="w-full py-2 bg-slate-900 text-white rounded-[6px] text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
             >
               বন্ধ করুন
             </button>
           </div>
         </div>
       )}
+
+      {/* ============================================================
+          MOBILE NATIVE APP SLIDE-OUT DRAWER SYSTEM
+          ============================================================ */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden md:hidden animate-fadeIn">
+          {/* Backdrop Overlay */}
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Slide-out Drawer Panel */}
+          <div className="fixed inset-y-0 left-0 max-w-full flex">
+            <div className="w-[85vw] max-w-[320px] bg-white shadow-2xl flex flex-col justify-between overflow-hidden animate-slideInLeft border-r border-slate-100">
+              
+              {/* Drawer Top Brand Header */}
+              <div className="bg-gradient-to-r from-orange-50 via-white to-amber-50/50 p-4 border-b border-orange-100/70 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <img 
+                    src={displayStoreLogo || '/ettadimart-logo.svg'} 
+                    alt={displayStoreName} 
+                    className="h-9 w-9 object-contain rounded-[6px] shrink-0 shadow-2xs" 
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/ettadimart-favicon.svg';
+                    }}
+                  />
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900 tracking-tight leading-tight">
+                      {displayStoreName.trim() || 'Ettadi Mart'}
+                    </h3>
+                    <p className="text-[10px] font-semibold text-[#F37022] leading-tight">
+                      {displayTagline.trim() || 'China Direct Varieties'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-white rounded-[6px] transition-colors cursor-pointer"
+                  title="Close Menu"
+                  aria-label="Close Menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Drawer Scrollable Content */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 no-scrollbar">
+                
+                {/* Quick Action Badges: Track Order & Helpline */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsOrderTrackingOpen(true);
+                    }}
+                    className="flex flex-col items-center justify-center p-2.5 bg-orange-50/80 hover:bg-orange-100/80 rounded-[6px] border border-orange-200/80 text-center transition-all cursor-pointer group active:scale-95"
+                  >
+                    <Truck className="w-5 h-5 text-[#F37022] mb-1" />
+                    <span className="text-[11px] font-bold text-slate-900 leading-tight">Track Order</span>
+                    <span className="text-[9px] text-slate-500">অর্ডার ট্র্যাক</span>
+                  </button>
+
+                  <a
+                    href={`tel:${displayPhone}`}
+                    className="flex flex-col items-center justify-center p-2.5 bg-slate-50 hover:bg-slate-100 rounded-[6px] border border-slate-200 text-center transition-all cursor-pointer group active:scale-95"
+                  >
+                    <Phone className="w-5 h-5 text-[#F37022] mb-1" />
+                    <span className="text-[11px] font-bold text-slate-900 leading-tight">Call Helpline</span>
+                    <span className="text-[9px] text-slate-500">সরাসরি কল</span>
+                  </a>
+                </div>
+
+                {/* Primary Navigation Links */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 px-1">Navigation</p>
+                  <nav className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        navigateTo('home');
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-[6px] text-xs font-bold transition-colors cursor-pointer ${
+                        activeNav === 'home'
+                          ? 'bg-[#F37022] text-white shadow-xs'
+                          : 'text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Home className="w-4 h-4" />
+                        <span>Home (হোম)</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setSelectedCategoryCheckbox('All');
+                        navigateTo('shop');
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-[6px] text-xs font-bold transition-colors cursor-pointer ${
+                        activeNav === 'shop'
+                          ? 'bg-[#F37022] text-white shadow-xs'
+                          : 'text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>All Products (সব পণ্য)</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        navigateTo('about');
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-[6px] text-xs font-bold transition-colors cursor-pointer ${
+                        activeNav === 'about'
+                          ? 'bg-[#F37022] text-white shadow-xs'
+                          : 'text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Award className="w-4 h-4" />
+                        <span>About Us (আমাদের সম্পর্কে)</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        navigateTo('contact');
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-[6px] text-xs font-bold transition-colors cursor-pointer ${
+                        activeNav === 'contact'
+                          ? 'bg-[#F37022] text-white shadow-xs'
+                          : 'text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Contact & Support (যোগাযোগ)</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                    </button>
+                  </nav>
+                </div>
+
+                {/* Categories List */}
+                <div>
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Categories</p>
+                    <span className="text-[10px] text-[#F37022] font-semibold">{shopCategories.length} items</span>
+                  </div>
+                  <div className="space-y-1">
+                    {shopCategories.map((catName) => {
+                      const isCatSelected = selectedCategoryCheckbox.toLowerCase() === catName.toLowerCase();
+                      return (
+                        <button
+                          key={catName}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategoryCheckbox(catName);
+                            setIsMobileMenuOpen(false);
+                            setCurrentPage(1);
+                            if (activeNav !== 'shop') navigateTo('shop');
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-[6px] text-xs transition-colors cursor-pointer ${
+                            isCatSelected
+                              ? 'bg-orange-50 text-[#F37022] font-bold border border-orange-200'
+                              : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{catName}</span>
+                          </div>
+                          {isCatSelected && <Check className="w-3.5 h-3.5 text-[#F37022]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Assurance Trust Badges */}
+                <div className="p-3 bg-slate-50 rounded-[6px] border border-slate-100 space-y-2 text-[11px]">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>১০০% অথেনটিক চায়না কোয়ালিটি</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Truck className="w-4 h-4 text-sky-600 shrink-0" />
+                    <span>সারা বাংলাদেশে ক্যাশ অন ডেলিভারি</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <RefreshCw className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>৭ দিনের সহজ রিটার্ন নিশ্চয়তা</span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Drawer Bottom Footer */}
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsProfileOpen(true);
+                  }}
+                  className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-[6px] border border-slate-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Account & Lists</span>
+                </button>
+
+                {onGoToLogin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onGoToLogin();
+                    }}
+                    className="w-full py-1 text-[11px] text-slate-400 hover:text-slate-600 transition-colors cursor-pointer text-center"
+                  >
+                    Admin Login &rarr;
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          NATIVE MOBILE APP BOTTOM NAVIGATION BAR (Fixed at Screen Bottom)
+          ============================================================ */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0px)]">
+        {activeNav === 'product_detail' && activeProductDetail ? (
+          /* Mobile Sticky Buy Action Bar on Product Detail Page */
+          <div className="px-3 py-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleHomeClick}
+              className="flex flex-col items-center justify-center p-2 text-slate-600 hover:text-[#F37022] active:scale-90 transition-transform cursor-pointer shrink-0"
+              title="Home"
+            >
+              <Home className="w-5 h-5" />
+              <span className="text-[9px] font-medium mt-0.5">Home</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex flex-col items-center justify-center p-2 text-slate-600 hover:text-[#F37022] active:scale-90 transition-transform cursor-pointer shrink-0"
+              title="Cart"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {totalCartCount > 0 && (
+                <span className="absolute top-1 right-1 bg-[#F37022] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  {totalCartCount}
+                </span>
+              )}
+              <span className="text-[9px] font-medium mt-0.5">Cart</span>
+            </button>
+
+            {/* Add to Cart button */}
+            <button
+              type="button"
+              onClick={() => handleAddToCart(activeProductDetail, detailQuantity, selectedVariant || undefined)}
+              className="flex-1 py-2.5 px-2 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-[#F37022] rounded-[6px] text-xs font-bold flex items-center justify-center gap-1 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>কার্টে যোগ</span>
+            </button>
+
+            {/* Direct Buy Now button */}
+            <button
+              type="button"
+              onClick={() => {
+                handleAddToCart(activeProductDetail, detailQuantity, selectedVariant || undefined);
+                setIsCartOpen(false);
+                navigateTo('checkout');
+              }}
+              className="flex-1 py-2.5 px-3 bg-[#F37022] hover:bg-[#d95c10] text-white rounded-[6px] text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-orange-500/20"
+            >
+              <Zap className="w-4 h-4 fill-white" />
+              <span>অর্ডার করুন</span>
+            </button>
+          </div>
+        ) : (
+          /* Standard 5-Item Native Mobile Tab Bar */
+          <div className="grid grid-cols-5 items-center h-14 px-1">
+            {/* 1. Home */}
+            <button
+              type="button"
+              onClick={handleHomeClick}
+              className={`flex flex-col items-center justify-center h-full transition-transform active:scale-90 cursor-pointer ${
+                activeNav === 'home' ? 'text-[#F37022]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <div className="relative">
+                <Home className={`w-5 h-5 ${activeNav === 'home' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {activeNav === 'home' && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3.5 h-0.5 bg-[#F37022] rounded-full" />
+                )}
+              </div>
+              <span className={`text-[10px] tracking-tight mt-0.5 ${activeNav === 'home' ? 'font-bold' : 'font-medium'}`}>
+                Home
+              </span>
+            </button>
+
+            {/* 2. Shop / Categories */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategoryCheckbox('All');
+                navigateTo('shop');
+              }}
+              className={`flex flex-col items-center justify-center h-full transition-transform active:scale-90 cursor-pointer ${
+                activeNav === 'shop' ? 'text-[#F37022]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <div className="relative">
+                <LayoutGrid className={`w-5 h-5 ${activeNav === 'shop' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {activeNav === 'shop' && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3.5 h-0.5 bg-[#F37022] rounded-full" />
+                )}
+              </div>
+              <span className={`text-[10px] tracking-tight mt-0.5 ${activeNav === 'shop' ? 'font-bold' : 'font-medium'}`}>
+                Shop
+              </span>
+            </button>
+
+            {/* 3. Track Order */}
+            <button
+              type="button"
+              onClick={() => setIsOrderTrackingOpen(true)}
+              className="flex flex-col items-center justify-center h-full text-slate-500 hover:text-slate-900 transition-transform active:scale-90 cursor-pointer"
+            >
+              <Truck className="w-5 h-5 stroke-[1.8]" />
+              <span className="text-[10px] font-medium tracking-tight mt-0.5">
+                Track
+              </span>
+            </button>
+
+            {/* 4. Cart */}
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex flex-col items-center justify-center h-full text-slate-500 hover:text-slate-900 transition-transform active:scale-90 cursor-pointer"
+            >
+              <div className="relative">
+                <ShoppingCart className="w-5 h-5 stroke-[1.8]" />
+                {totalCartCount > 0 && (
+                  <span className="absolute -top-1 -right-2.5 bg-[#F37022] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs animate-scaleIn">
+                    {totalCartCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-medium tracking-tight mt-0.5">
+                Cart
+              </span>
+            </button>
+
+            {/* 5. Menu Drawer */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className={`flex flex-col items-center justify-center h-full transition-transform active:scale-90 cursor-pointer ${
+                isMobileMenuOpen ? 'text-[#F37022]' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Menu className="w-5 h-5 stroke-[1.8]" />
+              <span className="text-[10px] font-medium tracking-tight mt-0.5">
+                Menu
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
 
     </div>
   );

@@ -6,7 +6,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 export const reviewRouter = Router();
 
 // GET all reviews
-reviewRouter.get('/', cacheResponse({ ttlSeconds: 60, staleWhileRevalidateSeconds: 120, tag: 'reviews' }), async (req, res) => {
+reviewRouter.get('/', async (req, res) => {
   try {
     const items = await prisma.review.findMany();
     res.json(items);

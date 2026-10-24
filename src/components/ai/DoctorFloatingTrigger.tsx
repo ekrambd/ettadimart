@@ -11,10 +11,10 @@ interface DoctorFloatingTriggerProps {
 export const DoctorFloatingTrigger: React.FC<DoctorFloatingTriggerProps> = ({
   onOpenDoctor,
   selectedProductCount = 0,
-  whatsappNumber = '8801329458568',
-  storeName = 'SHOSTIR BAZAR'
+  whatsappNumber = '01726275850',
+  storeName = 'ETTADI MART'
 }) => {
-  const cleanPhone = (whatsappNumber || '8801329458568').replace(/[^0-9]/g, '');
+  const cleanPhone = (whatsappNumber || '01726275850').replace(/[^0-9]/g, '');
 
   return (
     <div className="fixed bottom-4 right-3.5 sm:bottom-5 sm:right-5 z-50 flex flex-col items-center gap-2 sm:gap-2.5 select-none pointer-events-none">

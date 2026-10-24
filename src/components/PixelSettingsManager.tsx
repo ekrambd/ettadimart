@@ -177,7 +177,7 @@ export default function PixelSettingsManager() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. shostir bazar, স্বস্তির বাজার, ajwa dates, raw almonds, organic honey"
+                placeholder="e.g. ettadi mart, ইত্যাদি মার্ট, china imported gadgets, smart lifestyle items"
                 value={settings.metaKeywords || ''}
                 onChange={(e) => setSettings({ ...settings, metaKeywords: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white focus:outline-none text-slate-900"

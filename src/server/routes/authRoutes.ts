@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { generateAdminToken, verifyAdminCredentials } from '../services/authService';
 import { requireAdmin } from '../middleware/adminAuth';
 import { authRateLimiter } from '../middleware/rateLimiter';
-import { storeSettings, updateStoreSettings } from '../data/store';
+import { saveDbSettings } from './settingsRoutes';
 
 const authRouter = Router();
 
@@ -10,7 +10,7 @@ const authRouter = Router();
  * POST /api/auth/login
  * Log in admin using phone or email and password. Protected with anti-brute-force rate limiter.
  */
-authRouter.post('/login', authRateLimiter, (req, res) => {
+authRouter.post('/login', authRateLimiter, async (req, res) => {
   const { identifier, password } = req.body || {};
 
   if (!identifier || !password) {
@@ -18,7 +18,7 @@ authRouter.post('/login', authRateLimiter, (req, res) => {
     return;
   }
 
-  const result = verifyAdminCredentials(identifier, password);
+  const result = await verifyAdminCredentials(identifier, password);
 
   if (!result.valid || !result.user) {
     res.status(401).json({ success: false, message: 'Invalid credentials. Please verify your phone/email and password.' });
@@ -58,7 +58,7 @@ authRouter.post('/logout', (req, res) => {
  * POST /api/auth/change-password
  * Change admin password (requires admin session).
  */
-authRouter.post('/change-password', requireAdmin, (req, res) => {
+authRouter.post('/change-password', requireAdmin, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
 
   if (!newPassword || newPassword.length < 6) {
@@ -66,19 +66,18 @@ authRouter.post('/change-password', requireAdmin, (req, res) => {
     return;
   }
 
-  const adminEmail = (req as any).admin?.email || process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'admin@fantinebd.com';
-  const adminPhone = (req as any).admin?.phone || process.env.ADMIN_PHONE || process.env.VITE_ADMIN_PHONE || '01329458568';
+  const adminEmail = (req as any).admin?.email || process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'admin@ettadimart.com';
+  const adminPhone = (req as any).admin?.phone || process.env.ADMIN_PHONE || process.env.VITE_ADMIN_PHONE || '01726275850';
 
-  const verifyEmail = verifyAdminCredentials(adminEmail, currentPassword);
-  const verifyPhone = verifyAdminCredentials(adminPhone, currentPassword);
+  const verifyEmail = await verifyAdminCredentials(adminEmail, currentPassword);
+  const verifyPhone = await verifyAdminCredentials(adminPhone, currentPassword);
 
   if (!verifyEmail.valid && !verifyPhone.valid) {
     res.status(401).json({ success: false, message: 'Current password is incorrect' });
     return;
   }
 
-  // Persist updated password to disk so it survives server restarts
-  updateStoreSettings({ adminCustomPassword: newPassword } as any);
+  await saveDbSettings({ adminCustomPassword: newPassword });
 
   res.json({ success: true, message: 'Admin password changed successfully' });
 });

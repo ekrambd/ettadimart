@@ -141,7 +141,7 @@ export const EcomSettingsSchema = z.object({
   heroBannerLeftLink: z.string().optional(),
   heroBannerRightImage: z.string().optional(),
   heroBannerRightLink: z.string().optional(),
-  trustBadges: z.record(z.any()).optional()
+  trustBadges: z.record(z.string(), z.any()).optional()
 }).passthrough();
 
 export const BookOrderSchema = z.object({

@@ -16,7 +16,7 @@ interface ProductCardProps {
 export const ProductCard = React.memo(function ProductCard({
   product,
   isWishlisted,
-  primaryColor = '#e11d48',
+  primaryColor = '#F37022',
   onToggleWishlist,
   onOpenDetail,
   onAddToCart,
@@ -32,7 +32,7 @@ export const ProductCard = React.memo(function ProductCard({
   const isOutOfStock = (product.stock ?? 0) <= 0 && !product.continueSelling;
 
   return (
-    <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 hover:border-slate-400 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group relative">
+    <div className="bg-white rounded-[6px] border border-slate-200/90 hover:border-slate-400 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group relative">
       {/* 1. Full-Width Edge-to-Edge Watch Cover Image */}
       <div 
         onClick={() => onOpenDetail(product)}
@@ -85,8 +85,8 @@ export const ProductCard = React.memo(function ProductCard({
         <div className="space-y-0.5">
           {/* Brand Name & Category */}
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] font-black text-rose-600 tracking-widest uppercase truncate">
-              {product.brand || 'TIMEPIECE'}
+            <span className="text-[10px] font-black text-[#F37022] tracking-widest uppercase truncate">
+              {product.brand || 'ETTADI MART'}
             </span>
             {product.category && (
               <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider truncate">
@@ -98,7 +98,7 @@ export const ProductCard = React.memo(function ProductCard({
           {/* Model / Subtitle / Title */}
           <h3 
             onClick={() => onOpenDetail(product)}
-            className="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug line-clamp-1 cursor-pointer hover:text-rose-600 transition-colors"
+            className="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug line-clamp-1 cursor-pointer hover:text-[#F37022] transition-colors"
             title={product.title}
           >
             {product.title}
@@ -140,10 +140,10 @@ export const ProductCard = React.memo(function ProductCard({
               onAddToCart(product, 1);
             }}
             disabled={isOutOfStock}
-            className={`w-full mt-2 py-1.5 sm:py-2 px-2.5 text-white text-[11px] sm:text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-300 shadow-xs cursor-pointer active:scale-[0.98] ${
+            className={`w-full mt-2 py-1.5 sm:py-2 px-2.5 text-white text-[11px] sm:text-xs font-bold rounded-[6px] flex items-center justify-center gap-1.5 transition-all duration-300 shadow-xs cursor-pointer active:scale-[0.98] ${
               isOutOfStock 
                 ? 'bg-slate-300 cursor-not-allowed opacity-70' 
-                : 'bg-slate-900 hover:bg-[#e11d48] hover:shadow-md'
+                : 'bg-slate-900 hover:bg-[#F37022] hover:shadow-md'
             }`}
           >
             <ShoppingBag className="w-3 h-3" />

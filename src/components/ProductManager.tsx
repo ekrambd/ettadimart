@@ -218,7 +218,8 @@ export default function ProductManager({
       setIsUnlisted(product.isUnlisted ?? false);
       setCodAvailable(product.codAvailable ?? true);
 
-      setDeliveryChargeEnabled(product.deliveryChargeEnabled ?? true);
+      const isFree = product.deliveryChargeEnabled === false || (product as any).freeDelivery === true || (product as any).isFreeDelivery === true;
+      setDeliveryChargeEnabled(!isFree);
       setDeliveryChargeAmount(product.deliveryChargeAmount ?? 0);
       setWeight(product.weight ?? '');
       setExclusiveDelivery(product.exclusiveDelivery ?? true);
@@ -482,6 +483,8 @@ export default function ProductManager({
       codAvailable,
       weight: weight !== '' ? Number(weight) : undefined,
       deliveryChargeEnabled,
+      freeDelivery: !deliveryChargeEnabled,
+      isFreeDelivery: !deliveryChargeEnabled,
       deliveryChargeAmount: Number(deliveryChargeAmount) || 0,
       exclusiveDelivery,
       addQrToImage,
@@ -608,8 +611,8 @@ export default function ProductManager({
         </button>
       </div>
 
-      {/* Filters, Search Bar & View Mode Switcher */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+      {/* Filters, Search Bar, View Mode Switcher & Filter Dropdowns */}
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-[6px] border border-slate-200/90 shadow-2xs">
         <div className="flex items-center gap-2 w-full md:w-auto flex-1 max-w-md">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -618,17 +621,17 @@ export default function ProductManager({
               placeholder="Search by product name or SKU..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-[6px] text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
             />
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0">
+          <div className="flex items-center bg-slate-100 p-1 rounded-[6px] border border-slate-200 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                viewMode === 'list' ? 'bg-white text-teal-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              className={`p-1.5 rounded-[6px] text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                viewMode === 'list' ? 'bg-white text-teal-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Vertical list view"
             >
@@ -638,8 +641,8 @@ export default function ProductManager({
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                viewMode === 'grid' ? 'bg-white text-teal-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              className={`p-1.5 rounded-[6px] text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                viewMode === 'grid' ? 'bg-white text-teal-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Grid view"
             >
@@ -649,17 +652,33 @@ export default function ProductManager({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Category Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-[6px] px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500">
+            <Tag className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer pr-1"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'all' ? 'All Categories' : cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Brand Filter Select */}
           {storeBrands.length > 0 && (
-            <div className="flex items-center gap-1 shrink-0 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-[6px] px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500">
               <Bookmark className="h-3.5 w-3.5 text-amber-600 shrink-0" />
               <select
                 value={selectedBrandFilter}
                 onChange={(e) => setSelectedBrandFilter(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer pr-1"
               >
-                <option value="all">All brands</option>
+                <option value="all">All Brands</option>
                 {storeBrands.map(b => (
                   <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
@@ -667,22 +686,22 @@ export default function ProductManager({
             </div>
           )}
 
-          <div className="flex items-center space-x-1.5 overflow-x-auto">
-            <Tag className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors whitespace-nowrap cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {cat === 'all'? 'All categories' : cat}
-              </button>
-            ))}
-          </div>
+          {/* Clear Filters Button (shows when any filter is active) */}
+          {(selectedCategory !== 'all' || selectedBrandFilter !== 'all' || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('all');
+                setSelectedBrandFilter('all');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 rounded-[6px] transition-colors cursor-pointer"
+              title="Reset all filters"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1524,9 +1543,10 @@ export default function ProductManager({
                           className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none disabled:opacity-50"
                         >
                           <option value="">which is not</option>
-                          {storeCategories.find(c => c.name === category)?.subcategories?.map((sub, i) => (
-                            <option key={i} value={sub}>{sub}</option>
-                          ))}
+                          {storeCategories.find(c => c.name === category)?.subcategories?.map((sub: any, i) => {
+                            const subName = typeof sub === 'string' ? sub : (sub?.name || '');
+                            return <option key={i} value={subName}>{subName}</option>;
+                          })}
                         </select>
                       </div>
                     </div>

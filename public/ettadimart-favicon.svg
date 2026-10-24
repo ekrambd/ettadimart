@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <linearGradient id="bagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F37022"/>
+      <stop offset="100%" stop-color="#DE5A0E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="500" height="500" rx="110" fill="#FFFFFF"/>
+  
+  <g transform="translate(50, 40) scale(7.1)">
+    <!-- Bag Handle -->
+    <path d="M 20 18 C 20 8, 36 8, 36 18" fill="none" stroke="#F37022" stroke-width="4" stroke-linecap="round"/>
+    <!-- Bag Body -->
+    <rect x="5" y="16" width="46" height="44" rx="10" fill="none" stroke="url(#bagGrad)" stroke-width="4" stroke-linejoin="round"/>
+    <!-- 'E' Emblem -->
+    <path d="M 21 28 C 21 24, 25 22, 31 22 L 39 22 C 43 22, 45 25, 45 28 L 29 28 L 29 33 L 37 33 C 42 33, 44 36, 44 39 L 29 39 L 29 46 L 41 46 C 45 46, 47 49, 47 52 L 27 52 C 23 52, 21 50, 21 46 Z" fill="url(#bagGrad)"/>
+  </g>
+</svg>

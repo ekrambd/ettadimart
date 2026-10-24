@@ -1,4 +1,4 @@
-# Robots.txt for SHOSTIR BAZAR (swastirbazar.com)
+# Robots.txt for ETTADI MART (ettadimart.com)
 # Optimized for Search Engines (SEO), Answer Engines (AEO), and Generative AI Engines (GEO)
 
 User-agent: Googlebot
@@ -9,8 +9,13 @@ User-agent: DuckDuckBot
 User-agent: Baiduspider
 User-agent: YandexBot
 Allow: /
+Disallow: /admin
 Disallow: /admin/
 Disallow: /api/
+Disallow: /checkout
+Disallow: /track-order
+Disallow: /my-orders
+Disallow: /login
 
 # Generative AI & Answer Engine Crawlers (GEO / AEO)
 User-agent: GPTBot
@@ -23,14 +28,26 @@ User-agent: Applebot-Extended
 User-agent: Amazonbot
 User-agent: FacebookBot
 Allow: /
+Disallow: /admin
 Disallow: /admin/
 Disallow: /api/
+Disallow: /checkout
+Disallow: /track-order
+Disallow: /my-orders
+Disallow: /login
 
 # Global Default
 User-agent: *
 Allow: /
+Disallow: /admin
 Disallow: /admin/
 Disallow: /api/
+Disallow: /checkout
+Disallow: /track-order
+Disallow: /my-orders
+Disallow: /login
 
-# XML Sitemap
-Sitemap: https://shostirbazar.com/sitemap.xml
+# XML Sitemap & Feeds
+Sitemap: https://ettadimart.com/sitemap.xml
+# Google Merchant Shopping Feed: https://ettadimart.com/feed.xml
+# AI Knowledge File: https://ettadimart.com/llms.txt

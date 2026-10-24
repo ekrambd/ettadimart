@@ -43,32 +43,33 @@ function slugify(value) {
 async function generateSitemap() {
   console.log(`Generating sitemap...`);
   const urls = [
-    { loc: 'https://shostirbazar.com/', priority: '1.0', changefreq: 'daily' },
-    { loc: 'https://shostirbazar.com/shop', priority: '0.9', changefreq: 'daily' },
-    { loc: 'https://shostirbazar.com/about', priority: '0.8', changefreq: 'monthly' },
-    { loc: 'https://shostirbazar.com/contact', priority: '0.8', changefreq: 'monthly' },
-    { loc: 'https://shostirbazar.com/quiz', priority: '0.8', changefreq: 'weekly' },
-    { loc: 'https://shostirbazar.com/checkout', priority: '0.7', changefreq: 'weekly' }
+    { loc: 'https://ettadimart.com/', priority: '1.0', changefreq: 'daily' },
+    { loc: 'https://ettadimart.com/shop', priority: '0.9', changefreq: 'daily' },
+    { loc: 'https://ettadimart.com/about', priority: '0.8', changefreq: 'monthly' },
+    { loc: 'https://ettadimart.com/contact', priority: '0.8', changefreq: 'monthly' },
+    { loc: 'https://ettadimart.com/quiz', priority: '0.8', changefreq: 'weekly' }
   ];
 
   // Default store catalog products for offline/Firestore-free builds
-  const defaultProducts = [];
+  let productsToInclude = [];
 
-  const productsFile = path.join(__dirname, '../prisma/products.json');
-  let productsToInclude = defaultProducts;
-  if (fs.existsSync(productsFile)) {
-    try {
-      const real = JSON.parse(fs.readFileSync(productsFile, 'utf8'));
-      if (Array.isArray(real) && real.length > 0) {
-        productsToInclude = real;
+  try {
+    const Database = require('better-sqlite3');
+    const dbPath = path.join(__dirname, '../prisma/ettadimart.db');
+    if (fs.existsSync(dbPath)) {
+      const db = new Database(dbPath, { readonly: true });
+      const rows = db.prepare('SELECT id, title, slug FROM Product').all();
+      db.close();
+      if (Array.isArray(rows)) {
+        productsToInclude = rows;
       }
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
 
   productsToInclude.forEach(prod => {
     const slug = slugify(prod.slug || prod.title || prod.id);
     if (!slug) return;
-    const loc = `https://shostirbazar.com/product/${encodeURIComponent(slug)}/`;
+    const loc = `https://ettadimart.com/product/${encodeURIComponent(slug)}`;
     if (!urls.some(u => u.loc === loc)) {
       urls.push({ loc, priority: '0.8', changefreq: 'weekly' });
     }
@@ -89,7 +90,7 @@ async function generateSitemap() {
             const slugField = fields.slug ? fields.slug.stringValue : '';
             const slug = slugify(slugField || title || id);
             if (!slug) return;
-            const loc = `https://shostirbazar.com/product/${encodeURIComponent(slug)}/`;
+            const loc = `https://ettadimart.com/product/${encodeURIComponent(slug)}`;
             if (!urls.some(u => u.loc === loc)) {
               urls.push({ loc, priority: '0.8', changefreq: 'weekly' });
             }

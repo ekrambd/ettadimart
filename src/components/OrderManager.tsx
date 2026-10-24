@@ -228,7 +228,7 @@ export default function OrderManager({
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState<BookOrder | null>(null);
   const [bulkStatusConfirm, setBulkStatusConfirm] = useState<{ newStatus: string; count: number } | null>(null);
   const [invoiceBrand, setInvoiceBrand] = useState({
-    name: 'SHOSTIR BAZAR',
+    name: 'ETTADI MART',
     tagline: '',
     phone: '',
     email: '',
@@ -335,7 +335,7 @@ export default function OrderManager({
         const cleanWebsite = rawDomain ? rawDomain.replace(/^https?:\/\//i, '').replace(/\/$/, '') : '';
 
         setInvoiceBrand({
-          name: ecomSettings?.storeName || instituteInfo?.name || 'SHOSTIR BAZAR',
+          name: ecomSettings?.storeName || instituteInfo?.name || 'ETTADI MART',
           tagline: ecomSettings?.storeTagline || instituteInfo?.description || '',
           phone: instituteInfo?.phone || ecomSettings?.supportPhone || '',
           email: instituteInfo?.email || ecomSettings?.supportEmail || '',
@@ -992,8 +992,8 @@ export default function OrderManager({
               const price = ord.price || 0;
               const qty = ord.quantity || 1;
               const delivery = ord.deliveryCharge || 0;
-              const subtotal = ord.items && ord.items.length > 0
-                ? ord.items.reduce((sum: number, it: any) => sum + ((it.variant?.price || it.product?.price || it.price || 0) * (it.quantity || 1)), 0)
+              const subtotal = ord.items && (ord.items as any[]).length > 0
+                ? (ord.items as any[]).reduce((sum: number, it: any) => sum + ((it.variant?.price || it.product?.price || it.price || 0) * (it.quantity || 1)), 0)
                 : (price * qty);
               const grandTotal = ord.totalPrice || ord.totalAmount || (subtotal + delivery);
               const paidAmount = isPaid ? grandTotal : 0;

@@ -5,12 +5,12 @@ import { cacheResponse } from '../middleware/cacheMiddleware';
 
 export const landingRouter = Router();
 
-landingRouter.get('/', cacheResponse({ ttlSeconds: 120, staleWhileRevalidateSeconds: 300, tag: 'landing' }), async (req, res) => {
+landingRouter.get('/', async (req, res) => {
   const items = await prisma.landingPage.findMany();
   res.json(items);
 });
 
-landingRouter.get('/:id', cacheResponse({ ttlSeconds: 120, staleWhileRevalidateSeconds: 300, tag: 'landing' }), async (req, res) => {
+landingRouter.get('/:id', async (req, res) => {
   const rawId = req.params.id;
   let decoded = rawId;
   try {

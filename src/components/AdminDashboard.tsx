@@ -363,7 +363,7 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
                 <p className="text-xs font-bold text-emerald-400 mb-0.5">🎉 New Order Received!</p>
                 <p className="text-sm font-bold text-white truncate">{newOrderToast.customerName || 'Customer'}</p>
                 <p className="text-xs text-amber-300 font-semibold mt-0.5 truncate">
-                  {newOrderToast.id} · Tk. {(newOrderToast.totalAmount ?? newOrderToast.totalPrice ?? newOrderToast.total ?? 0).toLocaleString()}
+                  {newOrderToast.id} · Tk. {(newOrderToast.totalAmount ?? newOrderToast.totalPrice ?? (newOrderToast as any).total ?? 0).toLocaleString()}
                 </p>
                 {newOrderToast.phone && (
                   <p className="text-[11px] text-slate-400 truncate">{newOrderToast.phone}</p>

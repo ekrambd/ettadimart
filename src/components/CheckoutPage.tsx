@@ -174,7 +174,7 @@ export default function CheckoutPage({
 
   const couponDiscountAmount = useMemo(() => {
     if (!appliedCoupon) return 0;
-    if (appliedCoupon.type === 'percent') {
+    if (appliedCoupon.type === 'percentage' || (appliedCoupon.type as any) === 'percent') {
       const disc = Math.round((cartSubtotal * appliedCoupon.discount) / 100);
       return appliedCoupon.maxDiscount ? Math.min(disc, appliedCoupon.maxDiscount) : disc;
     }
@@ -283,7 +283,7 @@ export default function CheckoutPage({
         productTitle: cart.map(i => `${i.product.title}${i.variant?.name ? ` (${i.variant.name})` : ''} (x${i.quantity})`).join(', '),
         status: 'Pending',
         orderType: 'storefront',
-        paymentMethod: 'Cash on Delivery',
+        paymentMethod: 'COD',
         paymentGateway: 'Cash on Delivery',
         couponCode: appliedCoupon?.code,
         couponDiscount: couponDiscountAmount > 0 ? couponDiscountAmount : undefined,
@@ -410,7 +410,7 @@ export default function CheckoutPage({
           {/* 1-Click WhatsApp Order Confirmation */}
           <a
             href={`https://wa.me/${contactWa}?text=${encodeURIComponent(
-              `Hello SHOSTIR BAZAR,\nআমি একটি অর্ডার করেছি!\nঅর্ডার আইডি: #${orderSuccess.id}\nসর্বমোট: ${(orderSuccess.totalAmount || orderSuccess.totalPrice || 0).toLocaleString()} TK\nনাম: ${orderSuccess.customerName}\nমোবাইল: ${orderSuccess.customerPhone || orderSuccess.phone}\nঠিকানা: ${orderSuccess.address}\nঅনুগ্রহ করে ডেলিভারি কনফার্ম করুন!`
+              `Hello ${ecomSettings?.storeName || 'ETTADI MART'},\nআমি একটি অর্ডার করেছি!\nঅর্ডার আইডি: #${orderSuccess.id}\nসর্বমোট: ${(orderSuccess.totalAmount || orderSuccess.totalPrice || 0).toLocaleString()} TK\nনাম: ${orderSuccess.customerName}\nমোবাইল: ${orderSuccess.customerPhone || orderSuccess.phone}\nঠিকানা: ${orderSuccess.address}\nঅনুগ্রহ করে ডেলিভারি কনফার্ম করুন!`
             )}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -460,9 +460,9 @@ export default function CheckoutPage({
             <button
               type="button"
               onClick={onNavigateShop}
-              className="px-6 py-2.5 bg-[#FDD305] hover:bg-[#e6be02] text-slate-950 text-xs sm:text-sm font-bold rounded-xl cursor-pointer shadow-sm transition"
+              className="px-6 py-2.5 bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-bold rounded-xl cursor-pointer shadow-sm transition"
             >
-              পণ্য দেখুন
+              Explore Products
             </button>
 
           </div>
@@ -847,9 +847,9 @@ export default function CheckoutPage({
                           <button
                             type="button"
                             onClick={handleApplyCoupon}
-                            className="px-4 py-1.5 bg-[#FDD305] hover:bg-[#e6be02] text-slate-950 text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                            className="px-4 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
                           >
-                            এপ্লাই
+                            Apply
                           </button>
                         </div>
                         {couponError && <p className="text-[10px] text-rose-500 font-medium">{couponError}</p>}
@@ -874,50 +874,50 @@ export default function CheckoutPage({
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 text-slate-900 accent-[#FDD305] rounded cursor-pointer shrink-0"
+                  className="mt-0.5 w-4 h-4 text-[#F37022] accent-[#F37022] rounded cursor-pointer shrink-0"
                 />
                 <span className="leading-relaxed">
-                  আমি{' '}
+                  I have read and agree to the{' '}
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); onNavigateHome(); }}
-                    className="text-amber-800 underline font-medium hover:text-amber-950 inline p-0 bg-transparent border-0"
+                    className="text-[#F37022] underline font-medium hover:text-[#d95c10] inline p-0 bg-transparent border-0"
                   >
-                    শর্তাবলী ও ব্যবহারবিধি
+                    Terms & Conditions
                   </button>
                   ,{' '}
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); onNavigateHome(); }}
-                    className="text-amber-800 underline font-medium hover:text-amber-950 inline p-0 bg-transparent border-0"
+                    className="text-[#F37022] underline font-medium hover:text-[#d95c10] inline p-0 bg-transparent border-0"
                   >
-                    গোপনীয়তা নীতিমালা
+                    Privacy Policy
                   </button>
-                  {' '}ও{' '}
+                  {' '}and{' '}
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); onNavigateHome(); }}
-                    className="text-amber-800 underline font-medium hover:text-amber-950 inline p-0 bg-transparent border-0"
+                    className="text-[#F37022] underline font-medium hover:text-[#d95c10] inline p-0 bg-transparent border-0"
                   >
-                    পণ্য বিনিময় ও ফেরত নীতিমালা
+                    Return Policy
                   </button>
-                  {' '}পড়েছি এবং সম্মত আছি।
+                  .
                 </span>
               </label>
 
-              {/* Big #FDD305 Primary CTA Button */}
+              {/* Big Primary CTA Button (#F37022) */}
               <button
                 type="submit"
                 disabled={isSubmitting || cart.length === 0}
-                className="w-full py-3.5 sm:py-4 px-6 bg-[#FDD305] hover:bg-[#e6be02] active:scale-[0.99] text-slate-950 font-black text-base sm:text-lg rounded-xl shadow-lg shadow-amber-400/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 sm:py-4 px-6 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.99] text-white font-bold text-base sm:text-lg rounded-xl shadow-lg shadow-orange-500/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isSubmitting ? (
-                  <span className="flex items-center gap-2 text-slate-950">
-                    <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
-                    অর্ডার প্রসেস হচ্ছে...
+                  <span className="flex items-center gap-2 text-white">
+                    <RefreshCw className="w-5 h-5 animate-spin text-white" />
+                    Processing Order...
                   </span>
                 ) : (
-                  <span>অর্ডার কনফার্ম করুন {grandTotal.toLocaleString()} TK</span>
+                  <span>Confirm Order — {grandTotal.toLocaleString()} BDT</span>
                 )}
               </button>
 

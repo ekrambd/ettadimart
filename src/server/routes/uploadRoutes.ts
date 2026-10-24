@@ -28,7 +28,7 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max file size
 });
 
-uploadRouter.post('/', requireAdmin, upload.single('file'), (req, res) => {
+uploadRouter.post('/', requireAdmin, upload.single('file'), (req: any, res) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
     return;
