@@ -34,9 +34,21 @@ function formatProduct(p: any) {
     try { tableOfContents = JSON.parse(tableOfContents); } catch { tableOfContents = []; }
   }
 
+  const samplePages = Array.isArray(extraMeta.samplePages)
+    ? extraMeta.samplePages
+    : (Array.isArray(extraMeta.additionalImages)
+        ? extraMeta.additionalImages
+        : (Array.isArray(extraMeta.images) ? extraMeta.images : []));
+  const additionalImages = Array.isArray(extraMeta.additionalImages)
+    ? extraMeta.additionalImages
+    : samplePages;
+
   return {
     ...p,
     ...extraMeta,
+    samplePages,
+    additionalImages,
+    images: samplePages,
     deliveryChargeEnabled: extraMeta.deliveryChargeEnabled ?? p.deliveryChargeEnabled ?? true,
     freeDelivery: extraMeta.freeDelivery ?? (extraMeta.deliveryChargeEnabled === false),
     isFreeDelivery: extraMeta.isFreeDelivery ?? (extraMeta.deliveryChargeEnabled === false),
@@ -114,6 +126,20 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
 
   // Preserve deliveryChargeEnabled, freeDelivery, codAvailable and publishing metadata in features JSON column
   const meta: Record<string, any> = {};
+
+  if (data.features !== undefined) {
+    if (typeof data.features === 'string') {
+      try {
+        const parsed = JSON.parse(data.features);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          Object.assign(meta, parsed);
+        }
+      } catch {}
+    } else if (typeof data.features === 'object' && data.features !== null && !Array.isArray(data.features)) {
+      Object.assign(meta, data.features);
+    }
+  }
+
   if (data.deliveryChargeEnabled !== undefined) meta.deliveryChargeEnabled = Boolean(data.deliveryChargeEnabled);
   if (data.freeDelivery !== undefined) meta.freeDelivery = Boolean(data.freeDelivery);
   if (data.isFreeDelivery !== undefined) meta.isFreeDelivery = Boolean(data.isFreeDelivery);
@@ -128,6 +154,29 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
   if (data.weight !== undefined) meta.weight = toNum(data.weight);
   if (data.features !== undefined && Array.isArray(data.features) && data.features.length > 0) {
     meta.featuresList = data.features;
+  }
+
+  // Preserve multiple images / samplePages / additionalImages
+  const rawImages = data.samplePages ?? data.additionalImages ?? data.images;
+  if (Array.isArray(rawImages)) {
+    const cleanList = rawImages.filter((img: any) => typeof img === 'string' && img.trim());
+    if (cleanList.length > 0) {
+      meta.samplePages = cleanList;
+      meta.additionalImages = cleanList;
+      meta.images = cleanList;
+    }
+  } else if (typeof rawImages === 'string' && rawImages.trim()) {
+    try {
+      const parsed = JSON.parse(rawImages);
+      if (Array.isArray(parsed)) {
+        const cleanList = parsed.filter((img: any) => typeof img === 'string' && img.trim());
+        if (cleanList.length > 0) {
+          meta.samplePages = cleanList;
+          meta.additionalImages = cleanList;
+          meta.images = cleanList;
+        }
+      }
+    } catch {}
   }
 
   if (Object.keys(meta).length > 0) {
@@ -230,6 +279,21 @@ productRouter.put('/:id', requireAdmin, async (req, res) => {
     delete data.id;
     delete data.createdAt;
     delete data.updatedAt;
+
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (existing && existing.features) {
+      try {
+        const existingMeta = JSON.parse(existing.features);
+        if (typeof existingMeta === 'object' && existingMeta !== null) {
+          if (data.samplePages === undefined && data.additionalImages === undefined && data.images === undefined) {
+            data.samplePages = existingMeta.samplePages || existingMeta.additionalImages || existingMeta.images;
+          }
+          if (data.features === undefined) {
+            data.features = existingMeta;
+          }
+        }
+      } catch {}
+    }
 
     const sanitized = sanitizeProductForDb(data, true);
 

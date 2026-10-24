@@ -181,7 +181,14 @@ export default function ProductManager({
       setEdition(product.edition || '');
       setPages(product.pageCount ?? '');
       setSamplePdfUrlState(product.samplePdfUrl || '');
-      setSamplePages(product.samplePages || []);
+      const existingImgs = (Array.isArray(product.samplePages) && product.samplePages.length > 0)
+        ? product.samplePages
+        : (Array.isArray((product as any).additionalImages) && (product as any).additionalImages.length > 0)
+          ? (product as any).additionalImages
+          : (Array.isArray((product as any).images) && (product as any).images.length > 0)
+            ? (product as any).images
+            : [];
+      setSamplePages(existingImgs);
       setPdfUrl(product.pdfUrl || '');
       setTranslation(product.translation || '');
       setSku(product.sku || '');
@@ -503,6 +510,8 @@ export default function ProductManager({
       pageCount: pages === '' ? undefined : Number(pages),
       samplePdfUrl: samplePdfUrlState || undefined,
       samplePages: samplePages.length > 0 ? samplePages : undefined,
+      additionalImages: samplePages.length > 0 ? samplePages : undefined,
+      images: samplePages.length > 0 ? samplePages : undefined,
       hasVariants,
       variants: hasVariants ? variants : [],
       createdAt: editingProduct?.createdAt || new Date().toISOString()

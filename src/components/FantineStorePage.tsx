@@ -72,13 +72,43 @@ export const normalizeFantineProduct = (p: Product, index: number = 0): FantineP
   const regularPrice = p.regularPrice ? (typeof p.regularPrice === 'number' ? p.regularPrice : Number(p.regularPrice)) : undefined;
   const discountPercentage = p.discountPercentage || (regularPrice && regularPrice > price ? Math.round(((regularPrice - price) / regularPrice) * 100) : undefined);
   
-  const rawCover = (p as any).coverImage || p.image || (p as any).imageUrl || ((p as any).images && (p as any).images[0]) || ((p as any).samplePages && (p as any).samplePages[0]);
+  // Comprehensive collection of all candidate product images
+  const allImagesList: string[] = [];
+  const addCandidate = (imgCandidate: any) => {
+    if (!imgCandidate) return;
+    if (typeof imgCandidate === 'string') {
+      const trimmed = imgCandidate.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) parsed.forEach(addCandidate);
+          return;
+        } catch {}
+      }
+      const safe = getSafeSkincareImage(trimmed, allImagesList.length);
+      if (safe && safe !== DEFAULT_FANTINE_FALLBACK_IMAGE && !allImagesList.includes(safe)) {
+        allImagesList.push(safe);
+      }
+    } else if (Array.isArray(imgCandidate)) {
+      imgCandidate.forEach(addCandidate);
+    }
+  };
+
+  addCandidate((p as any).coverImage);
+  addCandidate(p.image);
+  addCandidate((p as any).imageUrl);
+  addCandidate((p as any).samplePages);
+  addCandidate((p as any).additionalImages);
+  addCandidate((p as any).images);
+  if (Array.isArray(p.variants)) {
+    p.variants.forEach((v: any) => {
+      if (v?.image) addCandidate(v.image);
+    });
+  }
+
+  const rawCover = (p as any).coverImage || p.image || (p as any).imageUrl || allImagesList[0];
   const coverImage = getSafeSkincareImage(rawCover, index);
-  
-  const rawAdditional = (p as any).additionalImages || (p as any).images || (p as any).samplePages;
-  const additionalImages = Array.isArray(rawAdditional) && rawAdditional.length > 0 
-    ? rawAdditional.map((img: string, i: number) => getSafeSkincareImage(img, i))
-    : [coverImage];
+  const additionalImages = allImagesList.length > 0 ? allImagesList : [coverImage];
 
   return {
     ...p,
@@ -1697,15 +1727,42 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
   const currentProductImages = useMemo(() => {
     if (!activeProductDetail) return ['/placeholder-image.svg'];
     const imgs: string[] = [];
-    if (activeProductDetail.coverImage) imgs.push(activeProductDetail.coverImage);
-    if (Array.isArray(activeProductDetail.additionalImages)) {
-      activeProductDetail.additionalImages.forEach(img => {
-        if (img && !imgs.includes(img)) imgs.push(img);
+    const addImg = (candidate: any) => {
+      if (!candidate) return;
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) parsed.forEach(addImg);
+            return;
+          } catch {}
+        }
+        if (trimmed && trimmed !== DEFAULT_FANTINE_FALLBACK_IMAGE && !imgs.includes(trimmed)) {
+          imgs.push(trimmed);
+        }
+      } else if (Array.isArray(candidate)) {
+        candidate.forEach(addImg);
+      }
+    };
+
+    // 1. Cover and main product images first
+    if (activeProductDetail.coverImage) addImg(activeProductDetail.coverImage);
+    if (activeProductDetail.image) addImg(activeProductDetail.image);
+    if ((activeProductDetail as any).imageUrl) addImg((activeProductDetail as any).imageUrl);
+
+    // 2. Additional images, samplePages, images
+    addImg(activeProductDetail.additionalImages);
+    addImg((activeProductDetail as any).samplePages);
+    addImg((activeProductDetail as any).images);
+
+    // 3. Variant images
+    if (Array.isArray(activeProductDetail.variants)) {
+      activeProductDetail.variants.forEach(v => {
+        if (v?.image) addImg(v.image);
       });
     }
-    if (imgs.length === 0 && activeProductDetail.image) {
-      imgs.push(activeProductDetail.image);
-    }
+
     return imgs.length > 0 ? imgs : ['/placeholder-image.svg'];
   }, [activeProductDetail]);
 
@@ -2210,43 +2267,12 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 items-start">
             
-            {/* Left Gallery: Naturo Style (Vertical Thumbnails on Left, Clean Main Image on Right) */}
-            <div className="lg:col-span-6 flex flex-col-reverse md:flex-row gap-3 sm:gap-4 items-start">
+            {/* Left Gallery: Clean Main Image on Top + Simple Horizontal Preview Thumbnails Below */}
+            <div className="lg:col-span-6 flex flex-col items-start w-full">
               
-              {/* Vertical Thumbnails List (Desktop: Left Column, Mobile: Horizontal Row Below) */}
-              {currentProductImages.length > 1 && (
-                <div className="flex flex-row md:flex-col gap-2.5 overflow-x-auto md:overflow-y-auto w-full md:w-20 lg:w-24 shrink-0 max-h-[520px] py-1 md:py-0 no-scrollbar">
-                  {currentProductImages.map((imgUrl, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setActiveImageIndex(idx)}
-                      className={`w-16 h-16 sm:w-20 sm:h-20 md:w-full md:h-20 lg:h-24 rounded-lg bg-white border-2 ${
-                        activeImageIndex === idx 
-                          ? 'border-slate-900 ring-2 ring-slate-900/20 shadow-sm' 
-                          : 'border-slate-200 hover:border-slate-400'
-                      } p-1.5 overflow-hidden transition-all shrink-0 cursor-pointer flex items-center justify-center`}
-                      aria-label={`View product image ${idx + 1}`}
-                    >
-                      <img 
-                        width={80} 
-                        height={80} 
-                        src={imgUrl} 
-                        alt={`${activeProductDetail.title} thumbnail ${idx + 1}`} 
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
-                        }}
-                        className="w-full h-full object-contain" 
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Main Product Frame (Clean, Professional & No Unwanted Hover Zooming) */}
+              {/* Main Product Frame (Clean, Professional & Clickable Cover Image) */}
               <div 
-                className="relative flex-1 w-full aspect-square max-h-[520px] bg-[#f8faf8] rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center group"
+                className="relative w-full aspect-square max-h-[520px] bg-white rounded-[6px] overflow-hidden border border-slate-200/90 flex items-center justify-center group shadow-2xs"
               >
                 <img 
                   fetchPriority="high" 
@@ -2258,7 +2284,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
                   }}
-                  className="w-4/5 h-4/5 object-contain select-none"
+                  className="w-full h-full object-contain p-2 select-none transition-all duration-200"
                 />
 
                 {/* Left/Right Carousel Arrows */}
@@ -2270,7 +2296,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                         e.stopPropagation();
                         setActiveImageIndex(prev => (prev === 0 ? currentProductImages.length - 1 : prev - 1));
                       }}
-                      className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 bg-black/40 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer z-10 shadow-sm"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer z-10 shadow-sm"
                       aria-label="Previous image"
                     >
                       <ChevronLeft className="w-5 h-5" />
@@ -2281,7 +2307,7 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                         e.stopPropagation();
                         setActiveImageIndex(prev => (prev === currentProductImages.length - 1 ? 0 : prev + 1));
                       }}
-                      className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 bg-black/40 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer z-10 shadow-sm"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer z-10 shadow-sm"
                       aria-label="Next image"
                     >
                       <ChevronRight className="w-5 h-5" />
@@ -2302,6 +2328,44 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                   <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
+
+              {/* Simple Multiple Image Preview: Click thumbnail to change cover image */}
+              {currentProductImages.length > 1 && (
+                <div className="mt-3 flex items-center gap-2.5 overflow-x-auto py-1 px-0.5 w-full no-scrollbar">
+                  {currentProductImages.map((imgUrl, idx) => {
+                    const isActive = activeImageIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveImageIndex(idx)}
+                        className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-[6px] bg-white border-2 ${
+                          isActive 
+                            ? 'border-[#F37022] ring-2 ring-[#F37022]/20 shadow-xs' 
+                            : 'border-slate-200 hover:border-[#F37022]/60 hover:shadow-2xs'
+                        } p-1 overflow-hidden transition-all shrink-0 cursor-pointer flex items-center justify-center`}
+                        title={`Click to preview image ${idx + 1}`}
+                        aria-label={`View product image ${idx + 1}`}
+                      >
+                        <img 
+                          width={80} 
+                          height={80} 
+                          src={imgUrl} 
+                          alt={`${activeProductDetail.title} preview ${idx + 1}`} 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
+                          }}
+                          className="w-full h-full object-contain select-none" 
+                        />
+                        {isActive && (
+                          <div className="absolute inset-0 bg-[#F37022]/5 pointer-events-none" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
             </div>
 
@@ -2403,7 +2467,15 @@ export default function FantineStorePage({ onGoToLogin, onGoToLanding }: Fantine
                             <button
                               key={v.id}
                               type="button"
-                              onClick={() => setSelectedVariant(v)}
+                              onClick={() => {
+                                setSelectedVariant(v);
+                                if (v.image) {
+                                  const vIdx = currentProductImages.findIndex(img => img === v.image);
+                                  if (vIdx !== -1) {
+                                    setActiveImageIndex(vIdx);
+                                  }
+                                }
+                              }}
                               className={`px-3.5 py-2 rounded-[6px] text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
                                 isSelected
                                   ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs ring-1 ring-[#F37022] font-bold'

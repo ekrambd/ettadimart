@@ -777,6 +777,26 @@ export default function BookLandingPage({ onNavigateHome }: BookLandingPageProps
             </div>
           )}
 
+          {/* Simple Multiple Image Preview: Click thumbnail to change cover image */}
+          {galleryImages.length > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2.5 pb-1 overflow-x-auto max-w-md mx-auto no-scrollbar">
+              {galleryImages.map((imgUrl, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setGalleryIndex(i)}
+                  className={`w-14 h-14 rounded-[6px] overflow-hidden border-2 transition-all cursor-pointer bg-white p-0.5 shrink-0 ${
+                    galleryIndex === i ? 'border-[#F37022] ring-2 ring-[#F37022]/30 scale-105 shadow-xs' : 'border-slate-300 opacity-70 hover:opacity-100'
+                  }`}
+                  title={`Preview image ${i + 1}`}
+                  aria-label={`Preview image ${i + 1}`}
+                >
+                  <img src={imgUrl} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-contain" />
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Order CTA under Slider */}
           <div className="pt-2">
             <button
