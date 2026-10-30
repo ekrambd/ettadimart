@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Product, CategoryItem, Brand } from '../types';
+import { Product, CategoryItem, Brand, Vendor } from '../types';
 import { dbService } from '../lib/dbService';
 import { uploadDataUrlToStorage, uploadFileToStorage } from '../lib/storageService';
 import { 
   Plus, Search, Edit2, Trash2, Package, Check, X, Tag, Upload, 
   Link as LinkIcon, Loader2, Copy, Eye, Zap, ShieldCheck, 
-  QrCode, Barcode, HelpCircle, Sparkles, ArrowRight, BookOpen, FileText, Layers,
-  List, LayoutGrid, Image as ImageIcon, Settings, Sliders, MoreVertical, ExternalLink, Bookmark
+  QrCode, Barcode, HelpCircle, Sparkles, ArrowRight, ArrowLeft, Globe, BookOpen, FileText, Layers,
+  List, LayoutGrid, Image as ImageIcon, Settings, Sliders, MoreVertical, ExternalLink, Bookmark, Store
 } from 'lucide-react';
 import { compressImage } from '../lib/imageUtils';
 import { getProductSlug, slugifyProductText } from '../lib/seoUtils';
 import { FeedbackDialog } from './ui/FeedbackDialog';
 
-type DetailTab = 'title-summary' | 'price' | 'category' | 'image' | 'publishing';
+type DetailTab = 'basic' | 'price' | 'media' | 'attributes' | 'seo';
 
 interface ProductManagerProps {
   products: Product[];
@@ -33,7 +33,7 @@ export default function ProductManager({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<DetailTab>('title-summary');
+  const [activeTab, setActiveTab] = useState<DetailTab>('basic');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [feedback, setFeedback] = useState<{
     isOpen: boolean;
@@ -76,7 +76,17 @@ export default function ProductManager({
   const [subCategory, setSubCategory] = useState('');
   const [brand, setBrand] = useState('');
   const [storeBrands, setStoreBrands] = useState<Brand[]>([]);
+  const [storeAttributes, setStoreAttributes] = useState<import('../types').ProductAttribute[]>([]);
+  const [storeUnits, setStoreUnits] = useState<import('../types').ProductUnit[]>([]);
+  const [unit, setUnit] = useState('kg');
+  const [minOrderQty, setMinOrderQty] = useState<number | ''>(1);
+  const [selectedAttributesState, setSelectedAttributesState] = useState<Record<string, string[]>>({});
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [selectedCategoriesList, setSelectedCategoriesList] = useState<string[]>([]);
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
+  const [vendorId, setVendorId] = useState('');
+  const [vendorName, setVendorName] = useState('');
+  const [storeVendors, setStoreVendors] = useState<Vendor[]>([]);
   const [slug, setSlug] = useState('');
   const [seoTitle, setSeoTitle] = useState('');
   const [seoDescription, setSeoDescription] = useState('');
@@ -85,11 +95,15 @@ export default function ProductManager({
   useEffect(() => {
     async function loadData() {
       try {
-        const [settings, brandsData] = await Promise.all([
+        const [settings, brandsData, vendorsData, attributesData, unitsData, categoriesData] = await Promise.all([
           dbService.getEcomSettings(),
-          dbService.getBrands()
+          dbService.getBrands(),
+          dbService.getVendors(),
+          dbService.getAttributes(),
+          dbService.getUnits(),
+          dbService.getCategories()
         ]);
-        let loadedCats: CategoryItem[] = [];
+        let loadedCats: CategoryItem[] = categoriesData && categoriesData.length > 0 ? categoriesData : (settings.categoryItems || []);
         if (settings.categoryItems && settings.categoryItems.length > 0) {
           loadedCats = settings.categoryItems;
         } else if (settings.categories && settings.categories.length > 0) {
@@ -101,6 +115,9 @@ export default function ProductManager({
         }
         setStoreCategories(loadedCats);
         setStoreBrands(brandsData || []);
+        setStoreVendors(vendorsData || []);
+        setStoreAttributes(attributesData || []);
+        setStoreUnits(unitsData || []);
         if (loadedCats.length > 0 && (!category || !loadedCats.some(c => c.name.trim().toLowerCase() === category.trim().toLowerCase()))) {
           setCategory(loadedCats[0].name);
         }
@@ -130,6 +147,12 @@ export default function ProductManager({
   const [regularPrice, setRegularPrice] = useState<number | ''>(0); // List / Regular Price
   const [vatPercent, setVatPercent] = useState<number | ''>(0);
   const [isFlashPrice, setIsFlashPrice] = useState(false);
+
+  // Wholesale / Paikari Pricing State
+  const [isWholesaleAvailable, setIsWholesaleAvailable] = useState<boolean>(false);
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
+  const [wholesaleMinOrderQty, setWholesaleMinOrderQty] = useState<number | ''>(10);
+  const [maxOrderQty, setMaxOrderQty] = useState<number | ''>('');
 
   // Inventory State
   const [stock, setStock] = useState<number | ''>(100);
@@ -196,9 +219,15 @@ export default function ProductManager({
       setShortSummary(product.shortSummary || '');
       setDescription(product.description || '');
       setSubtitle(product.subtitle || '');
-      setCategory(product.category || 'general');
+      setCategory(product.category || 'Vegetables');
       setSubCategory(product.subCategory || '');
+      setSelectedCategoriesList(product.category ? [product.category, ...(product.subCategory ? [product.subCategory] : [])] : ['Vegetables']);
+      setUnit(product.unit || 'kg');
+      setMinOrderQty(product.minOrderQty ?? 1);
+      setSelectedAttributesState((product as any).selectedAttributes ? (typeof (product as any).selectedAttributes === 'string' ? JSON.parse((product as any).selectedAttributes) : (product as any).selectedAttributes) : {});
       setBrand(product.brand || '');
+      setVendorId(product.vendorId || '');
+      setVendorName(product.vendorName || '');
       setSlug(product.slug || getProductSlug(product));
       setSeoTitle(product.seoTitle || '');
       setSeoDescription(product.seoDescription || '');
@@ -213,6 +242,12 @@ export default function ProductManager({
       setPrice(product.price ?? 0);
       setRegularPrice(product.regularPrice || product.price || 0);
       setVatPercent(product.vatPercent ?? 0);
+
+      // Wholesale / Paikari
+      setIsWholesaleAvailable(product.isWholesaleAvailable ?? false);
+      setWholesalePrice(product.wholesalePrice ?? (product as any).paikariPrice ?? '');
+      setWholesaleMinOrderQty(product.minOrderQty ?? 10);
+      setMaxOrderQty(product.maxOrderQty ?? '');
 
       setStock(product.stock ?? 100);
       setIsAvailable(product.isAvailable ?? true);
@@ -274,6 +309,12 @@ export default function ProductManager({
       setRegularPrice(0);
       setVatPercent(0);
 
+      // Wholesale / Paikari
+      setIsWholesaleAvailable(false);
+      setWholesalePrice('');
+      setWholesaleMinOrderQty(10);
+      setMaxOrderQty('');
+
       setStock(100);
       setIsAvailable(true);
       setIsPrivate(false);
@@ -293,7 +334,7 @@ export default function ProductManager({
       setGiftWrapEnabled(false);
       setGiftWrapPrice(0);
     }
-    setActiveTab('title-summary');
+    setActiveTab('basic');
     setIsModalOpen(true);
   };
 
@@ -475,9 +516,18 @@ export default function ProductManager({
       costPrice: Number(costPrice) || 0,
       vatPercent: Number(vatPercent) || 0,
       image: image.trim() || 'https://images.unsplash.com/photo-1608248597359-0098f98a329d?w=800&auto=format&fit=crop&q=85',
-      category: category.trim() || 'general',
-      subCategory: subCategory.trim(),
+      category: (selectedCategoriesList[0] || category).trim() || 'Vegetables',
+      subCategory: (selectedCategoriesList[1] || subCategory).trim(),
       brand: brand.trim() || undefined,
+      unit: unit || 'kg',
+      minOrderQty: isWholesaleAvailable && wholesaleMinOrderQty !== '' ? Number(wholesaleMinOrderQty) : (minOrderQty !== '' ? Number(minOrderQty) : 1),
+      maxOrderQty: maxOrderQty !== '' ? Number(maxOrderQty) : undefined,
+      wholesalePrice: isWholesaleAvailable && wholesalePrice !== '' ? Number(wholesalePrice) : undefined,
+      paikariPrice: isWholesaleAvailable && wholesalePrice !== '' ? Number(wholesalePrice) : undefined,
+      isWholesaleAvailable,
+      selectedAttributes: selectedAttributesState,
+      vendorId: vendorId || undefined,
+      vendorName: vendorName || undefined,
       stock: stock !== '' ? Number(stock) : 0,
       isAvailable,
       isPrivate,
@@ -511,7 +561,6 @@ export default function ProductManager({
       samplePdfUrl: samplePdfUrlState || undefined,
       samplePages: samplePages.length > 0 ? samplePages : undefined,
       additionalImages: samplePages.length > 0 ? samplePages : undefined,
-      images: samplePages.length > 0 ? samplePages : undefined,
       hasVariants,
       variants: hasVariants ? variants : [],
       createdAt: editingProduct?.createdAt || new Date().toISOString()
@@ -580,17 +629,26 @@ export default function ProductManager({
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.subtitle && p.subtitle.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.brand && p.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.slug && p.slug.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.seoKeywords && p.seoKeywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase())));
-    const matchesCat = selectedCategory === 'all' || p.category === selectedCategory;
-    const matchesBrand = selectedBrandFilter === 'all' || p.brand === selectedBrandFilter;
-    return matchesSearch && matchesCat && matchesBrand;
-  });
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term && selectedCategory === 'all' && selectedBrandFilter === 'all') {
+      return products;
+    }
+    return products.filter(p => {
+      const matchesSearch = !term ||
+        p.title.toLowerCase().includes(term) ||
+        (p.subtitle && p.subtitle.toLowerCase().includes(term)) ||
+        (p.sku && p.sku.toLowerCase().includes(term)) ||
+        (p.brand && p.brand.toLowerCase().includes(term)) ||
+        (p.category && p.category.toLowerCase().includes(term)) ||
+        (p.subCategory && p.subCategory.toLowerCase().includes(term)) ||
+        (p.slug && p.slug.toLowerCase().includes(term)) ||
+        (p.seoKeywords && p.seoKeywords.some(keyword => keyword.toLowerCase().includes(term)));
+      const matchesCat = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchesBrand = selectedBrandFilter === 'all' || p.brand === selectedBrandFilter;
+      return matchesSearch && matchesCat && matchesBrand;
+    });
+  }, [products, searchTerm, selectedCategory, selectedBrandFilter]);
 
   const normalizedSeoSlug = slugifyProductText(slug || title) || 'product-url';
   const hasDuplicateSlug = products.some(product =>
@@ -621,17 +679,27 @@ export default function ProductManager({
       </div>
 
       {/* Filters, Search Bar, View Mode Switcher & Filter Dropdowns */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-[6px] border border-slate-200/90 shadow-2xs">
-        <div className="flex items-center gap-2 w-full md:w-auto flex-1 max-w-md">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center gap-2 w-full md:w-auto flex-1 max-w-lg">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-teal-600" />
             <input
               type="text"
-              placeholder="Search by product name or SKU..."
+              placeholder="Search by product name, title, brand or SKU..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-[6px] text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none transition-all placeholder:text-slate-400"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* View Mode Toggle */}
@@ -1044,151 +1112,468 @@ export default function ProductManager({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[94vh] flex flex-col shadow-2xl border border-slate-200 my-auto overflow-hidden">
             
-            {/* Modal Header */}
-            <div className="flex justify-between items-center border-b border-slate-100 px-6 py-4 bg-white shrink-0 sticky top-0 z-20">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <Package className="h-5 w-5 text-teal-600" />
-                  <span>{ editingProduct ? 'Product Details & Information' : 'Add New Product'}</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Select the tab productShiRoname, category, picture, Details and Publishing Control Update।
-                </p>
+            {/* Modal Header matching Screenshot 3 & 5 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 px-6 py-4 bg-white shrink-0 sticky top-0 z-20 gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base leading-tight">
+                    {editingProduct ? 'Edit Product' : 'Add Product'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">
+                    {title || 'Yellow Melon'}
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-xl transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Bookmark className="w-4 h-4 text-slate-500" />
+                  <span>Save as Draft</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{editingProduct ? 'Update Product' : 'Publish Product'}</span>
+                </button>
+              </div>
             </div>
 
-            {/* TAB-WISE NAVIGATION HEADER */}
-            <div className="bg-slate-50 border-b border-slate-200 px-6 py-2.5 flex items-center gap-2 overflow-x-auto shrink-0 scrollbar-hide">
+            {/* TAB-WISE NAVIGATION HEADER (Matching Screenshot 3, 4, 5) */}
+            <div className="bg-slate-50/90 border-b border-slate-200 px-6 py-2 flex items-center gap-6 overflow-x-auto shrink-0 scrollbar-hide text-xs font-bold text-slate-600">
               <button
                 type="button"
-                onClick={() => setActiveTab('title-summary')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'title-summary' ? 'bg-teal-700 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                onClick={() => setActiveTab('basic')}
+                className={`py-2.5 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'basic' ? 'border-emerald-600 text-emerald-700 font-extrabold' : 'border-transparent hover:text-slate-900'
                 }`}
               >
-                <FileText className="h-4 w-4" />
-                <span>Title and description</span>
+                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px]">ℹ</span>
+                <span>Basic Information</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('price')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'price' ? 'bg-teal-700 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                className={`py-2.5 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'price' ? 'border-emerald-600 text-emerald-700 font-extrabold' : 'border-transparent hover:text-slate-900'
                 }`}
               >
-                <span className="text-sm font-black">Tk.</span>
-                <span>Price and Selling</span>
+                <Tag className="w-4 h-4 text-emerald-600" />
+                <span>Pricing & Stock</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveTab('category')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'category' ? 'bg-teal-700 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                onClick={() => setActiveTab('media')}
+                className={`py-2.5 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'media' ? 'border-emerald-600 text-emerald-700 font-extrabold' : 'border-transparent hover:text-slate-900'
                 }`}
               >
-                <Tag className="h-4 w-4" />
-                <span>category</span>
+                <ImageIcon className="w-4 h-4 text-emerald-600" />
+                <span>Media</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveTab('image')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'image' ? 'bg-teal-700 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                onClick={() => setActiveTab('attributes')}
+                className={`py-2.5 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'attributes' ? 'border-emerald-600 text-emerald-700 font-extrabold' : 'border-transparent hover:text-slate-900'
                 }`}
               >
-                <ImageIcon className="h-4 w-4" />
-                <span>Photos and Gallery</span>
+                <Layers className="w-4 h-4 text-emerald-600" />
+                <span>Categories & Attributes</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveTab('publishing')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'publishing' ? 'bg-teal-700 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                onClick={() => setActiveTab('seo')}
+                className={`py-2.5 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'seo' ? 'border-emerald-600 text-emerald-700 font-extrabold' : 'border-transparent hover:text-slate-900'
                 }`}
               >
-                <ShieldCheck className="h-4 w-4" />
-                <span>Publishing Control</span>
+                <Globe className="w-4 h-4 text-emerald-600" />
+                <span>SEO & Meta</span>
               </button>
             </div>
 
             {/* Scrollable Form Body */}
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto text-xs flex-1 space-y-6">
               
-              {/* TAB 1: TITLE & SUMMARY CONTENT */}
-              {activeTab === 'title-summary' && (
-                <div className="space-y-6 animate-fadeIn">
-                  {/* Identity Box */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <FileText className="h-4 w-4 text-teal-600" />
-                        <span>Product name and identification</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        customerShown to productShiRoname, Write subtitles, brief summary and detailed description।
-                      </p>
-                    </div>
+              {/* ============================================================== */}
+              {/* TAB 1: BASIC INFORMATION (Matching Screenshot 3, 4, 5)         */}
+              {/* ============================================================== */}
+              {activeTab === 'basic' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  
+                  {/* Left Column (8 cols): Basic Info Box */}
+                  <div className="lg:col-span-8 space-y-5">
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">Basic Information</h4>
+                          <p className="text-[11px] text-slate-500">Enter the main details about your product</p>
+                        </div>
+                      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4">
-                      {/* Title */}
-                      <div className="md:col-span-10">
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Product Titleproductof name *</label>
+                      {/* Product Name */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Product Name <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
                           required
-                          placeholder="Eg: Easy Quran Majeed"
+                          placeholder="Yellow Melon"
                           value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                          onChange={(e) => {
+                            setTitle(e.target.value);
+                            if (!editingProduct) {
+                              setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
 
-                      {/* Short Summary (as Description size) */}
-                      <div className="md:col-span-10">
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          <span>Short SummaryBrief summary *</span>
+                      {/* Product Slug / Permalink */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Product Slug / Permalink
                         </label>
-                        <textarea
+                        <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:bg-white">
+                          <span className="px-3.5 py-2.5 text-xs text-slate-400 font-medium select-none bg-slate-100 border-r border-slate-200">
+                            https://ettadimart.com/products/
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="yellow-melon"
+                            value={slug}
+                            onChange={(e) => setSlug(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-transparent text-xs font-semibold text-slate-800 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Select Brand & Unit & Multi-Vendor Shop */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Select Brand
+                          </label>
+                          <select
+                            value={brand}
+                            onChange={(e) => setBrand(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                          >
+                            <option value="">Select Brand</option>
+                            {storeBrands.map((b) => (
+                              <option key={b.id} value={b.name}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Vendor / Merchant Shop
+                          </label>
+                          <select
+                            value={vendorId}
+                            onChange={(e) => {
+                              const vId = e.target.value;
+                              setVendorId(vId);
+                              const match = storeVendors.find(v => v.id === vId);
+                              setVendorName(match?.storeName || '');
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                          >
+                            <option value="">Default Store (Admin Owned)</option>
+                            {storeVendors.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {v.storeName} ({v.ownerName})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Unit <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            value={unit}
+                            onChange={(e) => setUnit(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                          >
+                            {storeUnits.length > 0 ? (
+                              storeUnits.map((u) => (
+                                <option key={u.id} value={u.code || u.name}>
+                                  {u.name.toUpperCase()}
+                                </option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="kg">KG</option>
+                                <option value="g">G</option>
+                                <option value="litre">LITRE</option>
+                                <option value="piece">PIECE</option>
+                                <option value="pack">PACK</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Product SKU with Generate Code */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+                          <span className="text-slate-700">Product SKU *</span>
+                          <button
+                            type="button"
+                            onClick={() => setSku(Math.floor(100000 + Math.random() * 900000).toString())}
+                            className="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer"
+                          >
+                            Generate Code
+                          </button>
+                        </div>
+                        <input
+                          type="text"
                           required
-                          rows={6}
-                          placeholder="Write details about product details, specifications or features..."
+                          placeholder="525580"
+                          value={sku}
+                          onChange={(e) => setSku(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      {/* Short Description */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
+                          <span>Short Description</span>
+                          <span className="text-slate-400 font-medium">Optional</span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          placeholder="Sweet and juicy yellow melon, rich in vitamins and hydration, perfect for fresh snacks, smoothies, and refreshing summer treats."
                           value={shortSummary}
                           onChange={(e) => setShortSummary(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none resize-y leading-relaxed"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
 
-                      {/* Quick Badges in Tab 1 */}
-                      <div className="md:col-span-10 grid grid-cols-1 gap-3 pt-2">
-                        <label className="flex items-center gap-3 p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-xl cursor-pointer hover:bg-emerald-50 transition-colors">
+                      {/* Full Description with Formatting Toolbar matching Screenshot 5 */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
+                          <span>Full Description *</span>
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDescription(`How to Enjoy ${title || 'Product'}:\n• Freshly sliced as a healthy breakfast or snack.\n• Blended into delicious nutrient-rich smoothies.\n• Packaged sealed for maximum freshness and aroma.`);
+                              }}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                              ✨ Generate AI
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Formatting toolbar header */}
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <div className="bg-slate-100/80 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center gap-2 text-slate-600 text-xs font-semibold">
+                            <span className="px-2 py-0.5 bg-white rounded border border-slate-200 text-slate-700">Normal</span>
+                            <span className="px-2 py-0.5 bg-white rounded border border-slate-200 text-slate-700">Sans Serif</span>
+                            <div className="h-4 w-px bg-slate-300 mx-1"></div>
+                            <span className="font-bold cursor-pointer hover:text-slate-900">B</span>
+                            <span className="italic cursor-pointer hover:text-slate-900">I</span>
+                            <span className="underline cursor-pointer hover:text-slate-900">U</span>
+                            <span className="line-through cursor-pointer hover:text-slate-900">S</span>
+                            <div className="h-4 w-px bg-slate-300 mx-1"></div>
+                            <span className="cursor-pointer hover:text-slate-900">• List</span>
+                            <span className="cursor-pointer hover:text-slate-900">1. List</span>
+                          </div>
+                          <textarea
+                            rows={6}
+                            required
+                            placeholder="Write comprehensive product description, health benefits, instructions, or features..."
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="w-full p-4 bg-white text-xs font-normal text-slate-800 leading-relaxed outline-none"
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Right Column (4 cols): Product Status & Category Picker (Screenshot 2, 3, 4, 5) */}
+                  <div className="lg:col-span-4 space-y-5">
+                    
+                    {/* Card 1: Product Status */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
+                      <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <Check className="w-4 h-4" />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900">Product Status</h4>
+                      </div>
+
+                      <div className="space-y-2.5 pt-1 text-xs">
+                        <label className="flex items-start gap-2.5 cursor-pointer">
                           <input
-                            type="checkbox"
-                            checked={isNewArrival}
-                            onChange={(e) => setIsNewArrival(e.target.checked)}
-                            className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                            type="radio"
+                            name="prod-status"
+                            checked={isAvailable}
+                            onChange={() => setIsAvailable(true)}
+                            className="mt-0.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                           />
                           <div>
-                            <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                              <span>New Arrival Badge</span>
-                              <span className="bg-[#00b862] text-white text-[9px] font-bold px-1.5 py-0.5 rounded">NEW</span>
-                            </span>
-                            <span className="text-[10px] text-slate-500 block">The homepage will show a New Arrivals section and a green 'New' badge</span>
+                            <span className="font-bold text-slate-900 block">Publish</span>
+                            <span className="text-[11px] text-slate-500">Make it visible on store</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="prod-status"
+                            checked={!isAvailable}
+                            onChange={() => setIsAvailable(false)}
+                            className="mt-0.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="font-bold text-slate-900 block">Draft</span>
+                            <span className="text-[11px] text-slate-500">Hidden until you publish it</span>
                           </div>
                         </label>
                       </div>
                     </div>
+
+                    {/* Card 2: Categories * Multi-Check Hierarchy (Screenshot 2) */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900">Categories *</h4>
+                        </div>
+                      </div>
+
+                      {/* Search categories input */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search categories..."
+                          value={categorySearchTerm}
+                          onChange={(e) => setCategorySearchTerm(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      {/* Category Checkboxes List matching Screenshot 2 */}
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1 text-xs">
+                        {storeCategories
+                          .filter(c => !c.parentId)
+                          .filter(c => c.name.toLowerCase().includes(categorySearchTerm.toLowerCase()) || 
+                            storeCategories.some(sub => sub.parentId === c.id && sub.name.toLowerCase().includes(categorySearchTerm.toLowerCase()))
+                          )
+                          .map((parent) => {
+                            const isChecked = selectedCategoriesList.includes(parent.name);
+                            const childCats = storeCategories.filter(sub => sub.parentId === parent.id);
+
+                            return (
+                              <div key={parent.id} className="space-y-1.5">
+                                <label className="flex items-center gap-2.5 cursor-pointer font-bold text-slate-800 hover:text-emerald-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedCategoriesList(prev => [...prev, parent.name]);
+                                        setCategory(parent.name);
+                                      } else {
+                                        setSelectedCategoriesList(prev => prev.filter(name => name !== parent.name));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>{parent.name}</span>
+                                </label>
+
+                                {childCats.length > 0 && (
+                                  <div className="pl-6 space-y-1 border-l border-slate-100 ml-2">
+                                    {childCats.map(child => {
+                                      const isChildChecked = selectedCategoriesList.includes(child.name);
+                                      return (
+                                        <label key={child.id} className="flex items-center gap-2 cursor-pointer font-medium text-slate-600 hover:text-emerald-700">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChildChecked}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setSelectedCategoriesList(prev => [...prev, child.name]);
+                                                setSubCategory(child.name);
+                                              } else {
+                                                setSelectedCategoriesList(prev => prev.filter(name => name !== child.name));
+                                              }
+                                            }}
+                                            className="w-3.5 h-3.5 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                          <span>{child.name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = window.prompt('Enter new category name:');
+                            if (name?.trim()) {
+                              dbService.saveCategory({ name: name.trim() }).then(newCat => {
+                                setStoreCategories(prev => [...prev, newCat]);
+                                setSelectedCategoriesList(prev => [...prev, newCat.name]);
+                              });
+                            }
+                          }}
+                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add New Category</span>
+                        </button>
+                      </div>
+
+                    </div>
+
                   </div>
+
                 </div>
               )}
 
@@ -1383,13 +1768,71 @@ export default function ProductManager({
                             </button>
                           </div>
                         ))}
+                        {/* Quick Presets from Configured Attributes */}
+                        {storeAttributes && storeAttributes.length > 0 && (
+                          <div className="pt-2 pb-3 border-b border-slate-100 space-y-2">
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                              ⚡ Quick Presets from Attributes (Color / Size / Weight / Packs):
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {storeAttributes.map(attr => (
+                                <div key={attr.id} className="inline-flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                                  <span className="text-[11px] font-bold text-slate-700 pl-1.5">{attr.name}:</span>
+                                  <div className="flex items-center gap-1">
+                                    {attr.values.slice(0, 5).map((val, vIdx) => (
+                                      <button
+                                        key={vIdx}
+                                        type="button"
+                                        onClick={() => {
+                                          const defaultWeight = parseFloat(val) || (val.toLowerCase().includes('500g') ? 0.5 : 1);
+                                          setVariants([
+                                            ...variants,
+                                            {
+                                              id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                                              name: val,
+                                              price: Number(price) || 0,
+                                              regularPrice: Number(regularPrice) || undefined,
+                                              weight: defaultWeight
+                                            }
+                                          ]);
+                                        }}
+                                        className="px-2 py-0.5 bg-white hover:bg-teal-50 hover:text-teal-700 text-slate-800 text-[10px] font-semibold rounded-md border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                                      >
+                                        + {val}
+                                      </button>
+                                    ))}
+                                    {attr.values.length > 5 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newVars = attr.values.map(val => ({
+                                            id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                                            name: val,
+                                            price: Number(price) || 0,
+                                            regularPrice: Number(regularPrice) || undefined,
+                                            weight: parseFloat(val) || 1
+                                          }));
+                                          setVariants([...variants, ...newVars]);
+                                        }}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-md shadow-2xs transition-colors cursor-pointer"
+                                      >
+                                        + Add All {attr.name}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => setVariants([...variants, { id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, name: '', price: 0, image: '', weight: 0.5 }])}
                           className="mt-2 text-xs font-bold text-teal-700 hover:text-teal-800 bg-white hover:bg-teal-50 border border-teal-300 px-3.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
                         >
                           <Plus className="h-3.5 w-3.5 text-teal-600" />
-                          <span>আরেকটি ওজন / ভেরিয়েন্ট যোগ করুন (Add Variant)</span>
+                          <span>আরেকটি ওজন / ভেরিয়েন্ট যোগ করুন (Add Custom Variant)</span>
                         </button>
                       </div>
                     )}
@@ -1442,6 +1885,73 @@ export default function ProductManager({
                       </div>
                     </div>
 
+                    {/* Wholesale / Paikari Pricing (পাইকারি রেট ও কোয়ান্টিটি) */}
+                    <div className="border border-amber-200 bg-amber-50/40 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="wholesale_available"
+                            checked={isWholesaleAvailable}
+                            onChange={(e) => setIsWholesaleAvailable(e.target.checked)}
+                            className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <label htmlFor="wholesale_available" className="font-bold text-slate-900 cursor-pointer text-xs flex items-center gap-1.5">
+                            <span>পাইকারি / Wholesale বিক্রয় প্রযোজ্য</span>
+                            <span className="text-[10px] font-medium px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">শুধুমাত্র পাইকারি গ্রাহকদের জন্য</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {isWholesaleAvailable && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                          <div>
+                            <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                              Wholesale / Paikari Rate (৳) *
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 520"
+                              value={wholesalePrice}
+                              onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-extrabold text-amber-700 shadow-xs focus:ring-2 focus:ring-amber-400 focus:outline-hidden"
+                            />
+                            <p className="text-[10px] text-amber-700/80 mt-1">খুচরা মূল্যের চেয়ে কম পাইকারি দর</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Min Wholesale Order Qty *
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="10"
+                              min="1"
+                              value={wholesaleMinOrderQty}
+                              onChange={(e) => setWholesaleMinOrderQty(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-1">কমপক্ষে কত পিস নিলে পাইকারি রেট পাবে</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Max Order Qty (ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="No limit"
+                              min="1"
+                              value={maxOrderQty}
+                              onChange={(e) => setMaxOrderQty(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-1">এক অর্ডারে সর্বোচ্চ নেওয়ার লিমিট</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Gift Wrapper Option */}
                     <div className="border-t border-slate-100 pt-4 mt-4 space-y-3">
                       <div className="flex items-center gap-2">
@@ -1474,201 +1984,158 @@ export default function ProductManager({
                 </div>
               )}
 
-              {/* TAB 3: CATEGORY */}
-              {activeTab === 'category' && (
+              {/* ============================================================== */}
+              {/* TAB 4: CATEGORIES & ATTRIBUTES (Matching Screenshot 1)         */}
+              {/* ============================================================== */}
+              {activeTab === 'attributes' && (
                 <div className="space-y-6 animate-fadeIn">
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <Tag className="h-4 w-4 text-teal-600" />
-                        <span>Category and type</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        productof category, Sub-Category And book/Provide publication related information।
-                      </p>
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <Sliders className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900">Attributes</h4>
+                          <p className="text-xs text-slate-500">
+                            Colour, size and the like. <span className="text-blue-600 hover:underline cursor-pointer font-semibold">Set them up</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
+                        {category || 'Vegetables'}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                          <Layers className="h-3.5 w-3.5 text-teal-600" />
-                          <span>Product Type *</span>
-                        </label>
-                        <select
-                          value={productType}
-                          onChange={(e) => setProductType(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none"
-                        >
-                          <option value="Physical product">Physical productthe physical product</option>
-                          <option value="Digital product">Digital productDigital book/file</option>
-                          <option value="Book / Publication">Book / Publicationbook/publication</option>
-                          <option value="Service">Serviceservice</option>
-                        </select>
+                    <div className="space-y-6">
+                      {/* Category Header Badge */}
+                      <div className="text-xs font-bold text-slate-800">
+                        {category || 'Fruits'}
                       </div>
 
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                          <Tag className="h-3.5 w-3.5 text-teal-600" />
-                          <span>Main Category *</span>
-                        </label>
-                        <select
-                          value={category}
-                          onChange={(e) => {
-                            setCategory(e.target.value);
-                            setSubCategory('');
-                          }}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none"
-                        >
-                          <option value="">Select...</option>
-                          {storeCategories.map(cat => (
-                            <option key={cat.id} value={cat.name}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                      {storeAttributes && storeAttributes.length > 0 ? (
+                        storeAttributes.map((attr) => {
+                          const selectedVals = selectedAttributesState[attr.name] || [];
+                          const isColorAttr = attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour');
 
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                          <Bookmark className="h-3.5 w-3.5 text-amber-600" />
-                          <span>Brand</span>
-                        </label>
-                        <select
-                          value={brand}
-                          onChange={(e) => setBrand(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none"
-                        >
-                          <option value="">Select brand...</option>
-                          {storeBrands.map(b => (
-                            <option key={b.id} value={b.name}>{b.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                          // Color mapping helper
+                          const getColorDot = (valName: string) => {
+                            const v = valName.toLowerCase();
+                            if (v.includes('black')) return 'bg-black border border-slate-700';
+                            if (v.includes('white')) return 'bg-white border border-slate-300';
+                            if (v.includes('red')) return 'bg-red-500';
+                            if (v.includes('blue')) return 'bg-blue-600';
+                            if (v.includes('green')) return 'bg-emerald-500';
+                            if (v.includes('grey') || v.includes('gray')) return 'bg-slate-400';
+                            if (v.includes('yellow')) return 'bg-amber-400';
+                            if (v.includes('orange')) return 'bg-orange-500';
+                            if (v.includes('pink')) return 'bg-pink-500';
+                            if (v.includes('purple')) return 'bg-purple-600';
+                            return null;
+                          };
 
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Sub-optional</label>
-                        <select
-                          value={subCategory}
-                          onChange={(e) => setSubCategory(e.target.value)}
-                          disabled={!category}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none disabled:opacity-50"
-                        >
-                          <option value="">which is not</option>
-                          {storeCategories.find(c => c.name === category)?.subcategories?.map((sub: any, i) => {
-                            const subName = typeof sub === 'string' ? sub : (sub?.name || '');
-                            return <option key={i} value={subName}>{subName}</option>;
-                          })}
-                        </select>
-                      </div>
-                    </div>
+                          return (
+                            <div key={attr.id} className="space-y-2.5">
+                              <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+                                {attr.name}
+                              </p>
 
-                    {((productType || '').toLowerCase().includes('book') || (category || '').toLowerCase() === 'book') && (
-                      <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
-                        <h5 className="text-xs font-bold text-emerald-800 mb-3 flex items-center gap-1.5">
-                          <BookOpen className="h-4 w-4" />
-                          book / Publication information
-                        </h5>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Writer / Authorthe writer *</label>
-                            <input type="text" placeholder="Eg: Noor Mohammad Dewan" value={primaryAuthor} onChange={(e) => setPrimaryAuthor(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Print TypePrint type</label>
-                            <input type="text" placeholder="Eg: news print" value={printType} onChange={(e) => setPrintType(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
-                          </div>
-                        </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {attr.values.map((val, vIdx) => {
+                                  const isChecked = selectedVals.includes(val);
+                                  const colorDot = isColorAttr ? getColorDot(val) : null;
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">ISBN</label>
-                            <input type="text" placeholder="ISBN number" value={isbn} onChange={(e) => setIsbn(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Color Grade</label>
-                            <input type="text" placeholder="e.g. 4 Color" value={colorGrade} onChange={(e) => setColorGrade(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">PagesNumber of pages</label>
-                            <input type="number" placeholder="250" value={pages} onChange={(e) => setPages(e.target.value === '' ? '' : Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
-                          </div>
-                        </div>
+                                  // Pill style matching Screenshot 3 Green active state (+0 badge)
+                                  if (isChecked) {
+                                    return (
+                                      <div
+                                        key={vIdx}
+                                        onClick={() => {
+                                          const nextSelected = selectedVals.filter(item => item !== val);
+                                          setSelectedAttributesState({
+                                            ...selectedAttributesState,
+                                            [attr.name]: nextSelected
+                                          });
+                                        }}
+                                        className="h-9 px-3.5 rounded-full text-xs font-bold bg-emerald-600 text-white flex items-center gap-2.5 shadow-xs cursor-pointer select-none transition-all"
+                                      >
+                                        <div className="w-4 h-4 rounded flex items-center justify-center bg-white/20">
+                                          <Check className="w-3 h-3 text-white stroke-[3]" />
+                                        </div>
+                                        {colorDot && (
+                                          <span className={`w-3 h-3 rounded-full shrink-0 ${colorDot}`}></span>
+                                        )}
+                                        <span>{val}</span>
+                                        <div className="h-4 w-px bg-white/30 ml-0.5"></div>
+                                        <span className="text-[11px] font-semibold text-emerald-100">+0</span>
+                                      </div>
+                                    );
+                                  }
 
-                        <div className="mt-3 border-t border-emerald-100 pt-3">
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Short Preview PDFRead on</label>
-                          <p className="text-[10px] text-slate-400 mb-2">Customers can read this PDF for free by clicking the "Read" button.</p>
+                                  return (
+                                    <label
+                                      key={vIdx}
+                                      className="h-9 px-3.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all border border-slate-200 hover:border-slate-300 bg-white text-slate-700 select-none shadow-2xs"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={false}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            const nextSelected = [...selectedVals, val];
+                                            setSelectedAttributesState({
+                                              ...selectedAttributesState,
+                                              [attr.name]: nextSelected
+                                            });
 
-                          <div className="space-y-3">
-                            {/* Upload Button */}
-                            <label className="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors w-fit">
-                              {isUploadingSamplePdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                              <input type="file" accept="application/pdf" onChange={async (ev) => {
-                                const f = ev.target.files?.[0];
-                                if (!f) return;
-                                try {
-                                  setIsUploadingSamplePdf(true);
-                                  const dest = `products/${editingProduct?.id || 'new'}-sample-${Date.now()}.pdf`;
-                                  const url = await uploadFileToStorage(f, dest);
-                                  setSamplePdfUrlState(url);
-                                } catch (err: any) {
-                                  console.error('Sample PDF upload failed:', err);
-                                  setFeedback({
-                                    isOpen: true,
-                                    type: 'error',
-                                    title: 'PDF upload failed',
-                                    message: 'There was a problem uploading the PDF file. Please try again.'
-                                  });
-                                } finally {
-                                  setIsUploadingSamplePdf(false);
-                                }
-                              }} className="hidden" />
-                              {isUploadingSamplePdf ? 'Uploading PDF...' : 'Upload the PDF file'}
-                            </label>
-                            
-                            {/* URL Input */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 font-bold uppercase">Or give the link:</span>
-                              <input 
-                                type="text" 
-                                placeholder="such as: /ebook/kg_2.pdf or URL" 
-                                value={samplePdfUrlState}
-                                onChange={(e) => setSamplePdfUrlState(e.target.value)}
-                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                              />
-                            </div>
-
-                            {/* Preview & Remove */}
-                            {samplePdfUrlState && (
-                              <div className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-xl mt-2">
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-emerald-50 rounded-lg">
-                                    <FileText className="h-5 w-5 text-emerald-600" />
-                                  </div>
-                                  <div>
-                                    <p className="text-[11px] font-bold text-slate-800">PDF link is set</p>
-                                    <button type="button" onClick={() => setPreviewPdfUrl(samplePdfUrlState)} className="text-[10px] text-emerald-600 hover:text-emerald-700 hover:underline font-bold mt-0.5 cursor-pointer">
-                                      View the PDF
-                                    </button>
-                                  </div>
-                                </div>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setSamplePdfUrlState('')} 
-                                  className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                >
-                                  <X className="h-3 w-3" /> remove
-                                </button>
+                                            setHasVariants(true);
+                                            const exists = variants.some(v => v.name.toLowerCase() === val.toLowerCase());
+                                            if (!exists) {
+                                              setVariants(prev => [
+                                                ...prev,
+                                                {
+                                                  id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                                                  name: val,
+                                                  price: Number(price) || 0,
+                                                  regularPrice: Number(regularPrice) || undefined,
+                                                  weight: parseFloat(val) || (val.toLowerCase().includes('500g') ? 0.5 : 1)
+                                                }
+                                              ]);
+                                            }
+                                          }
+                                        }}
+                                        className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                      />
+                                      {colorDot && (
+                                        <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${colorDot}`}></span>
+                                      )}
+                                      <span>{val}</span>
+                                    </label>
+                                  );
+                                })}
                               </div>
-                            )}
-                          </div>
-                        </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-slate-400">No custom attributes found. Go to Catalogue &gt; Attributes to add them.</p>
+                      )}
+                    </div>
+
+                    <div className="p-3.5 bg-emerald-50/80 border border-emerald-100 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
+                      <span className="text-base leading-none">💡</span>
+                      <div>
+                        <span className="font-bold">Tip: </span>
+                        <span>Fill in all the required fields and add high quality images to get better sales.</span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* TAB 4: IMAGE */}
-              {activeTab === 'image' && (
+              {/* TAB 3: MEDIA (Matching Screenshot 3) */}
+              {activeTab === 'media' && (
                 <div className="space-y-6 animate-fadeIn">
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5">
                     <div>
@@ -1789,8 +2256,8 @@ export default function ProductManager({
                 </div>
               )}
 
-              {/* TAB 5: PUBLISHING CONTROL */}
-              {activeTab === 'publishing' && (
+              {/* TAB 5: SEO & META */}
+              {activeTab === 'seo' && (
                 <div className="space-y-6 animate-fadeIn">
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5">
                     <div>

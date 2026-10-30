@@ -11,10 +11,13 @@ brandRouter.get('/', async (req, res) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   try {
-    const items = await prisma.brand.findMany();
+    const items = await (prisma as any).brand.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
     res.json(items);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch' });
+  } catch (error: any) {
+    console.error('Failed to fetch brands from DB:', error);
+    res.status(500).json({ error: 'Failed to fetch brands', details: error?.message });
   }
 });
 
@@ -35,35 +38,64 @@ brandRouter.get('/:id', async (req, res) => {
 // POST create
 brandRouter.post('/', requireAdmin, async (req, res) => {
   try {
-    const item = await prisma.brand.create({ data: req.body });
+    const { id, name, logo, description, website, isActive, sortOrder } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'Brand name is required' });
+    }
+
+    const payload: any = {
+      name: String(name).trim(),
+      logo: logo || null,
+      description: description || null,
+      website: website || null,
+      isActive: isActive !== false,
+      sortOrder: typeof sortOrder === 'number' ? sortOrder : 0
+    };
+    if (id && String(id).trim()) {
+      payload.id = String(id).trim();
+    }
+
+    const item = await (prisma as any).brand.create({ data: payload });
     globalCache.invalidateTag('brands');
     res.status(201).json(item);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create' });
+  } catch (error: any) {
+    console.error('Failed to create brand:', error);
+    res.status(500).json({ error: 'Failed to create brand', details: error?.message });
   }
 });
 
 // PUT update
 brandRouter.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const item = await prisma.brand.update({
+    const { name, logo, description, website, isActive, sortOrder } = req.body;
+    const payload: any = {};
+    if (name !== undefined) payload.name = String(name).trim();
+    if (logo !== undefined) payload.logo = logo || null;
+    if (description !== undefined) payload.description = description || null;
+    if (website !== undefined) payload.website = website || null;
+    if (isActive !== undefined) payload.isActive = Boolean(isActive);
+    if (sortOrder !== undefined) payload.sortOrder = Number(sortOrder) || 0;
+
+    const item = await (prisma as any).brand.update({
       where: { id: req.params.id },
-      data: req.body
+      data: payload
     });
     globalCache.invalidateTag('brands');
     res.json(item);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update' });
+  } catch (error: any) {
+    console.error('Failed to update brand:', error);
+    res.status(500).json({ error: 'Failed to update brand', details: error?.message });
   }
 });
 
 // DELETE
 brandRouter.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    await prisma.brand.delete({ where: { id: req.params.id } });
+    await (prisma as any).brand.delete({ where: { id: req.params.id } });
     globalCache.invalidateTag('brands');
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete' });
+  } catch (error: any) {
+    console.error('Failed to delete brand:', error);
+    res.status(500).json({ error: 'Failed to delete brand', details: error?.message });
   }
 });

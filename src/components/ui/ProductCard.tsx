@@ -1,6 +1,7 @@
 import React from 'react';
-import { Heart, ShoppingBag, Eye } from 'lucide-react';
+import { Heart, ShoppingBag, Eye, Tag } from 'lucide-react';
 import { Product } from '../../types';
+import { useAppStore } from '../../store/useAppStore';
 
 interface ProductCardProps {
   product: Product;
@@ -22,21 +23,26 @@ export const ProductCard = React.memo(function ProductCard({
   onAddToCart,
   onBuyNow,
 }: ProductCardProps) {
+  const currentCustomer = useAppStore(state => state.currentCustomer);
+  const isWholesaler = currentCustomer?.customerType === 'wholesaler';
+  const hasWholesaleRate = isWholesaler && product.isWholesaleAvailable && product.wholesalePrice != null && product.wholesalePrice > 0;
+
   const lowestVariant = product.hasVariants && product.variants?.length
     ? product.variants.reduce((prev, curr) => (prev.price < curr.price ? prev : curr))
     : null;
   const regPrice = lowestVariant ? lowestVariant.regularPrice : product.regularPrice;
-  const currentPrice = lowestVariant ? lowestVariant.price : product.price;
+  const standardPrice = lowestVariant ? lowestVariant.price : product.price;
+  const currentPrice = hasWholesaleRate ? Number(product.wholesalePrice) : standardPrice;
   const hasDiscount = regPrice && regPrice > currentPrice;
   const discountPercent = hasDiscount ? Math.round(((regPrice - currentPrice) / regPrice) * 100) : 0;
   const isOutOfStock = (product.stock ?? 0) <= 0 && !product.continueSelling;
 
   return (
     <div className="bg-white rounded-[6px] border border-slate-200/90 hover:border-slate-400 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group relative">
-      {/* 1. Full-Width Edge-to-Edge Watch Cover Image */}
+      {/* 1. Full-Width Edge-to-Edge Watch Cover Image (Extra Big & Prominent) */}
       <div 
         onClick={() => onOpenDetail(product)}
-        className="relative w-full aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer group/img select-none"
+        className="relative w-full aspect-[4/5] sm:aspect-square bg-slate-50 flex items-center justify-center overflow-hidden cursor-pointer group/img select-none"
       >
         {/* Top Left Badge (New Arrival or Discount) */}
         <div className="absolute top-2 left-2 z-20 flex flex-col gap-1">
@@ -64,18 +70,18 @@ export const ProductCard = React.memo(function ProductCard({
           <Heart className={`h-3.5 w-3.5 transition-colors ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
         </button>
 
-        {/* Watch Image with Full-Width Object Cover */}
+        {/* Watch Image with High-Impact Zoom Cover */}
         <img
-          src={product.image || 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=600&auto=format&fit=crop&q=80'}
-          alt={`${product.title} - ${product.brand || 'Watch'}`}
+          src={product.image || 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&auto=format&fit=crop&q=85'}
+          alt={`${product.title} - ${product.brand || 'Product'}`}
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+          className="w-full h-full object-contain sm:object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
         />
 
         {/* Quick View Hover Bar */}
-        <div className="absolute inset-x-0 bottom-0 py-1.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] sm:text-[11px] font-bold flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 z-10">
-          <Eye className="w-3 h-3" />
+        <div className="absolute inset-x-0 bottom-0 py-2 bg-slate-900/85 backdrop-blur-xs text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 z-10">
+          <Eye className="w-3.5 h-3.5" />
           <span>QUICK VIEW</span>
         </div>
       </div>
@@ -114,9 +120,18 @@ export const ProductCard = React.memo(function ProductCard({
 
         {/* Price & Action Button */}
         <div className="mt-2 pt-1.5 border-t border-slate-100">
+          {hasWholesaleRate && (
+            <div className="mb-1 flex items-center justify-between text-[10px] bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded font-bold">
+              <span className="flex items-center gap-1">
+                <Tag className="w-2.5 h-2.5 text-amber-600" />
+                পাইকারি রেট
+              </span>
+              <span className="text-[9px] text-amber-700">Min: {product.minOrderQty || 1} pcs</span>
+            </div>
+          )}
           <div className="flex items-baseline justify-between gap-1">
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-xs sm:text-sm font-black text-slate-900">
+              <span className={`text-xs sm:text-sm font-black ${hasWholesaleRate ? 'text-amber-700' : 'text-slate-900'}`}>
                 Tk. {currentPrice.toLocaleString('en-US')}
               </span>
               {hasDiscount && (

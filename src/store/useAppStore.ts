@@ -8,6 +8,16 @@ interface AppState {
   adminEmail: string | null;
   setAdminEmail: (email: string | null) => void;
   logoutAdmin: () => void;
+
+  // Logged-in Customer Profile (supports Wholesaler & Regular)
+  currentCustomer?: {
+    id?: string;
+    name: string;
+    phone: string;
+    address?: string;
+    customerType: 'regular' | 'wholesaler';
+  } | null;
+  setCurrentCustomer: (customer: { id?: string; name: string; phone: string; address?: string; customerType: 'regular' | 'wholesaler' } | null) => void;
   
   // Settings & Store Profile State
   ecomSettings?: EcomSettings | null;
@@ -29,6 +39,9 @@ export const useAppStore = create<AppState>()(
       adminEmail: null,
       setAdminEmail: (email) => set({ adminEmail: email }),
       logoutAdmin: () => set({ adminEmail: null }),
+
+      currentCustomer: null,
+      setCurrentCustomer: (customer) => set({ currentCustomer: customer }),
       
       ecomSettings: null,
       instituteInfo: null,

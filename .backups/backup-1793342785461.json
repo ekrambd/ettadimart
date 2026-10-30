@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "id": "backup-1793342785461",
+    "timestamp": "2026-10-30T06:46:25.461Z",
+    "collections": {
+      "productsCount": 1,
+      "ordersCount": 1,
+      "settingsIncluded": true
+    }
+  },
+  "data": {
+    "products": [
+      {
+        "id": "prod-test-1",
+        "title": "Smart Watch",
+        "price": 3200
+      }
+    ],
+    "orders": [
+      {
+        "id": "ord-test-1",
+        "totalAmount": 3200,
+        "status": "Completed"
+      }
+    ],
+    "settings": {
+      "storeName": "Backup Test Store"
+    }
+  }
+}

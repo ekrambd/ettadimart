@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Users, LogOut, Menu, X, Check, ShoppingBag, ShoppingCart, ClipboardList, Package, LayoutDashboard, User, Code, Truck, CreditCard, Tag, Boxes, Store, Globe, Layout, Layers, Bell, Coins, Send, Sparkles, Eye, Bookmark, Camera, Zap, Volume2, VolumeX, RefreshCw
+  Users, LogOut, Menu, X, Check, ShoppingBag, ShoppingCart, ClipboardList, Package, LayoutDashboard, User, Code, Truck, CreditCard, Tag, Boxes, Store, Globe, Layout, Layers, Bell, Coins, Send, Sparkles, Eye, Bookmark, Camera, Zap, Volume2, VolumeX, RefreshCw, Share2, ScanLine, ChevronDown, ChevronRight, FileText, Clock, Briefcase, Percent, Crown
 } from 'lucide-react';
 import { dbService, subscribeToOrders } from '../lib/dbService';
 import { playCuteAdminOrderTone, initAudioUnlock } from '../lib/soundUtils';
@@ -23,6 +23,16 @@ const CourierSettingsManager = lazy(() => import('./CourierSettingsManager'));
 const PaymentSettingsManager = lazy(() => import('./PaymentSettingsManager'));
 const DeliverySettingsManager = lazy(() => import('./DeliverySettingsManager'));
 const FlashSaleManager = lazy(() => import('./FlashSaleManager'));
+const SupplierManager = lazy(() => import('./SupplierManager'));
+const AffiliateManager = lazy(() => import('./AffiliateManager'));
+const VendorManager = lazy(() => import('./VendorManager'));
+const PosView = lazy(() => import('./PosView'));
+const VatTaxManager = lazy(() => import('./VatTaxManager'));
+const DriverManager = lazy(() => import('./DriverManager'));
+const SubscriptionManager = lazy(() => import('./SubscriptionManager'));
+const AttributesManager = lazy(() => import('./AttributesManager'));
+const UnitsManager = lazy(() => import('./UnitsManager'));
+const PurchaseManager = lazy(() => import('./PurchaseManager'));
 import { TabContentSkeleton } from './LoadingSkeleton';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,8 +42,31 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardProps) {
+  // Check if current logged-in user is a Vendor
+  const [vendorUser, setVendorUser] = useState<any>(() => {
+    try {
+      const raw = localStorage.getItem('vendor_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isVendorRole = Boolean(vendorUser && vendorUser.role === 'vendor');
+  const vendorStoreName = vendorUser?.storeName || 'Shop Vendor';
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isPosMenuOpen, setIsPosMenuOpen] = useState(false);
+  const [isProductsMenuOpen, setIsProductsMenuOpen] = useState(false);
+  const [isVendorsMenuOpen, setIsVendorsMenuOpen] = useState(false);
+  const [isSuppliersMenuOpen, setIsSuppliersMenuOpen] = useState(false);
+  const [isDriversMenuOpen, setIsDriversMenuOpen] = useState(false);
+  const [isMarketingMenuOpen, setIsMarketingMenuOpen] = useState(false);
+  const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
+  const [isPurchaseMenuOpen, setIsPurchaseMenuOpen] = useState(false);
+  const [isBusinessMenuOpen, setIsBusinessMenuOpen] = useState(false);
+  const [isStoreSetupMenuOpen, setIsStoreSetupMenuOpen] = useState(false);
   
   // App States
   const [orders, setOrders] = useState<BookOrder[]>([]);
@@ -87,8 +120,18 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
 
         // Seed known IDs from initial fetch (no toast for these)
         orderList.forEach(o => knownOrderIds.current.add(o.id));
-        setOrders(orderList);
-        setProducts(prodList);
+
+        // If vendor logged in, filter orders and products to this vendor
+        if (isVendorRole && vendorUser) {
+          const vId = vendorUser.vendorId || vendorUser.uid;
+          const vStore = (vendorUser.storeName || '').toLowerCase();
+          const filteredProds = prodList.filter(p => p.vendorId === vId || p.vendorName?.toLowerCase() === vStore);
+          setProducts(filteredProds);
+          setOrders(orderList);
+        } else {
+          setOrders(orderList);
+          setProducts(prodList);
+        }
         setCustomers(custList);
 
         // Run auto-sync of Steadfast courier status in the background
@@ -207,10 +250,12 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
       dbService.getCustomers().then(setCustomers);
     };
     window.addEventListener('ecom-products-updated', handleSync);
+    window.addEventListener('customers-updated', handleSync);
 
     return () => {
       unsubOrders();
       window.removeEventListener('ecom-products-updated', handleSync);
+      window.removeEventListener('customers-updated', handleSync);
       window.removeEventListener('ecom-settings-updated', handleSettingsUpdate);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
@@ -315,28 +360,155 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
     setCustomers(updatedCust);
   };
 
-  const menuItems = [
+  const menuItems = isVendorRole ? [
+    { id: 'dashboard' as const, label: 'Shop Dashboard', icon: LayoutDashboard },
+    { id: 'header_catalogue' as any, isHeader: true, label: 'MY SHOP CATALOGUE' },
+    {
+      id: 'products_group' as any,
+      label: 'My Products',
+      icon: Package,
+      isGroup: true,
+      subItems: [
+        { id: 'products' as const, label: 'All Products', dot: true },
+        { id: 'inventory' as const, label: 'Stock & Inventory' }
+      ]
+    },
+    { id: 'orders' as const, label: 'My Shop Orders', icon: ShoppingBag },
+    {
+      id: 'vendors_group' as any,
+      label: 'Wallet & Withdraw',
+      icon: Store,
+      isGroup: true,
+      subItems: [
+        { id: 'vendors_withdrawals' as const, label: 'Withdrawal Requests', dot: true }
+      ]
+    }
+  ] : [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'header_manage' as any, isHeader: true, label: 'E-commerce Management' },
-    { id: 'inventory' as const, label: 'Inventory', icon: Boxes },
-    { id: 'products' as const, label: 'Products', icon: Package },
+    { 
+      id: 'pos_group' as any,
+      label: 'POS',
+      icon: ScanLine,
+      isGroup: true,
+      subItems: [
+        { id: 'pos' as const, label: 'New Sale', dot: true },
+        { id: 'pos_offline_sales' as const, label: 'Offline Sales' },
+        { id: 'pos_drafts' as const, label: 'Draft Orders' }
+      ]
+    },
+    { id: 'header_catalogue' as any, isHeader: true, label: 'CATALOGUE' },
+    {
+      id: 'products_group' as any,
+      label: 'Products',
+      icon: Package,
+      isGroup: true,
+      subItems: [
+        { id: 'products' as const, label: 'All Products', dot: true },
+        { id: 'inventory' as const, label: 'Stock & Inventory' },
+        { id: 'attributes_management' as const, label: 'Attributes' },
+        { id: 'units_management' as const, label: 'Units' },
+        { id: 'category_management' as const, label: 'Categories' },
+        { id: 'sub_category_management' as const, label: 'Sub Categories' },
+        { id: 'brand_management' as const, label: 'Brands' }
+      ]
+    },
+    {
+      id: 'purchase_group' as any,
+      label: 'Purchase',
+      icon: RefreshCw,
+      isGroup: true,
+      subItems: [
+        { id: 'purchase_stock_report' as const, label: 'Stock Report', dot: true },
+        { id: 'purchase_create' as const, label: 'Add New Purchase' },
+        { id: 'purchase_invoices' as const, label: 'Purchase Invoices' },
+        { id: 'purchase_summary' as const, label: 'Purchase Summary' },
+        { id: 'purchase_returns' as const, label: 'Purchase Returns' },
+        { id: 'purchase_return_create' as const, label: 'Add Purchase Return' }
+      ]
+    },
     { id: 'orders' as const, label: 'Orders', icon: ShoppingBag },
     { id: 'customers' as const, label: 'Customers', icon: Users },
-    { id: 'coupons' as const, label: 'Coupons', icon: Tag },
-    { id: 'header_store' as any, isHeader: true, label: 'Store Setup' },
-    { id: 'flash_sale' as const, label: 'Flash Sale', icon: Zap },
-    { id: 'category_management' as const, label: 'Categories', icon: Layers },
-    { id: 'brand_management' as const, label: 'Brands', icon: Bookmark },
-    { id: 'landing_setup' as const, label: 'Landing Pages', icon: Globe },
-    { id: 'payment_settings' as const, label: 'Payments', icon: CreditCard },
-    { id: 'delivery_settings' as const, label: 'Delivery', icon: Truck },
-    { id: 'courier_settings' as const, label: 'Courier', icon: Send },
-    { id: 'pixel_settings' as const, label: 'Google Tag/Pixel', icon: Code },
-    { id: 'profile' as const, label: 'Profile Settings', icon: User },
+    {
+      id: 'vendors_group' as any,
+      label: 'Vendors',
+      icon: Store,
+      isGroup: true,
+      subItems: [
+        { id: 'vendors' as const, label: 'All Vendors', dot: true },
+        { id: 'vendors_create' as const, label: 'Add Vendor' },
+        { id: 'vendors_withdrawals' as const, label: 'Withdraw Requests' }
+      ]
+    },
+    {
+      id: 'subscriptions_group' as any,
+      label: 'Subscription',
+      icon: Crown,
+      isGroup: true,
+      subItems: [
+        { id: 'subscriptions' as const, label: 'All Plans', dot: true },
+        { id: 'subscriptions_create' as const, label: 'New Plan' }
+      ]
+    },
+    {
+      id: 'suppliers_group' as any,
+      label: 'Suppliers',
+      icon: Package,
+      isGroup: true,
+      subItems: [
+        { id: 'suppliers' as const, label: 'List Of Suppliers', dot: true },
+        { id: 'suppliers_create' as const, label: 'Add New Supplier' }
+      ]
+    },
+    {
+      id: 'drivers_group' as any,
+      label: 'Drivers',
+      icon: Truck,
+      isGroup: true,
+      subItems: [
+        { id: 'drivers' as const, label: 'All Drivers', dot: true },
+        { id: 'drivers_create' as const, label: 'New Driver' }
+      ]
+    },
+    {
+      id: 'marketing_group' as any,
+      label: 'Sales & Marketing',
+      icon: Zap,
+      isGroup: true,
+      subItems: [
+        { id: 'flash_sale' as const, label: 'Flash Sales', dot: true },
+        { id: 'flash_sale_create' as const, label: 'Add Flash Sale' },
+        { id: 'coupons' as const, label: 'Coupons / Promo Codes' },
+        { id: 'coupons_create' as const, label: 'Add Promo Code' },
+        { id: 'affiliates' as const, label: 'Affiliates' }
+      ]
+    },
+    { 
+      id: 'business_group' as any,
+      label: 'Business Settings',
+      icon: Briefcase,
+      isGroup: true,
+      subItems: [
+        { id: 'vat_tax' as const, label: 'VAT & Tax', dot: true },
+        { id: 'delivery_settings' as const, label: 'Delivery Charge' },
+        { id: 'payment_settings' as const, label: 'COD Settings' },
+        { id: 'courier_settings' as const, label: 'Courier' }
+      ]
+    },
+    { 
+      id: 'store_setup_group' as any,
+      label: 'Store Setup',
+      icon: Store,
+      isGroup: true,
+      subItems: [
+        { id: 'landing_setup' as const, label: 'Landing Pages', dot: true },
+        { id: 'pixel_settings' as const, label: 'Google Tag/Pixel' },
+        { id: 'profile' as const, label: 'Profile Settings' }
+      ]
+    },
   ];
 
   return (
-    <div className="admin-panel min-h-screen bg-slate-50 flex font-sans text-slate-800 text-[16px]">
+    <div className="admin-panel h-screen w-full bg-[#f8fafc] flex font-sans text-slate-800 text-[14px] antialiased overflow-hidden">
 
       {/* ===== New Order Toast Notification ===== */}
       <AnimatePresence>
@@ -387,27 +559,139 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
         )}
       </AnimatePresence>
 
-      <aside className="hidden lg:flex lg:flex-col lg:w-60 bg-slate-900 text-slate-400 border-r border-slate-800 shrink-0 sticky top-0 h-screen">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-slate-900 text-slate-400 border-r border-slate-800/80 shrink-0 sticky top-0 h-screen z-30">
         {/* Title / Header */}
-        <div className="h-16 flex items-center px-4 border-b border-slate-800 space-x-2.5 text-white">
-          <div className="h-8 w-8 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center font-bold shrink-0">
-            <ShoppingBag className="h-4.5 w-4.5" />
+        <div className="h-16 flex items-center px-5 border-b border-slate-800 space-x-3 text-white">
+          <div className="h-9 w-9 rounded-xl bg-teal-500/15 text-teal-400 border border-teal-500/30 flex items-center justify-center font-bold shrink-0 shadow-xs">
+            {isVendorRole ? <Store className="h-5 w-5" /> : <ShoppingBag className="h-5 w-5" />}
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm font-bold leading-tight text-white truncate">E-commerce Admin</h1>
-            <span className="text-xs text-teal-400 block font-medium truncate">Control Panel</span>
+            <h1 className="text-sm font-bold tracking-tight text-white truncate">
+              {isVendorRole ? vendorStoreName : 'ETTADI MART'}
+            </h1>
+            <span className="text-[11px] text-teal-400/90 block font-semibold truncate tracking-wider uppercase">
+              {isVendorRole ? 'Shop Vendor Panel' : 'Master Dashboard'}
+            </span>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-2.5 py-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {menuItems.map((item: any) => {
             if (item.isHeader) {
               return (
-                <div key={item.id} className="pt-4 pb-1 px-3">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div key={item.id} className="pt-4 pb-1.5 px-3">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                     {item.label}
                   </span>
+                </div>
+              );
+            }
+
+            if (item.isGroup) {
+              const isPosGroup = item.id === 'pos_group';
+              const isProductsGroup = item.id === 'products_group';
+              const isPurchaseGroup = item.id === 'purchase_group';
+              const isVendorsGroup = item.id === 'vendors_group';
+              const isSubscriptionsGroup = item.id === 'subscriptions_group';
+              const isSuppliersGroup = item.id === 'suppliers_group';
+              const isDriversGroup = item.id === 'drivers_group';
+              const isMarketingGroup = item.id === 'marketing_group' || item.id === 'flash_sales_group' || item.id === 'coupons_group';
+              const isBusinessGroup = item.id === 'business_group';
+              const isStoreSetupGroup = item.id === 'store_setup_group';
+
+              const isGroupActive = isPosGroup 
+                ? (activeTab === 'pos' || activeTab === 'pos_offline_sales' || activeTab === 'pos_drafts')
+                : isProductsGroup
+                ? (activeTab === 'products' || activeTab === 'inventory' || activeTab === 'attributes_management' || activeTab === 'units_management' || activeTab === 'category_management' || activeTab === 'sub_category_management' || activeTab === 'brand_management')
+                : isPurchaseGroup
+                ? (activeTab === 'purchase_stock_report' || activeTab === 'purchase_create' || activeTab === 'purchase_invoices' || activeTab === 'purchase_summary' || activeTab === 'purchase_returns' || activeTab === 'purchase_return_create')
+                : isVendorsGroup
+                ? (activeTab === 'vendors' || activeTab === 'vendors_create' || activeTab === 'vendors_withdrawals')
+                : isSubscriptionsGroup
+                ? (activeTab === 'subscriptions' || activeTab === 'subscriptions_create')
+                : isSuppliersGroup
+                ? (activeTab === 'suppliers' || activeTab === 'suppliers_create')
+                : isDriversGroup
+                ? (activeTab === 'drivers' || activeTab === 'drivers_create')
+                : isMarketingGroup
+                ? (activeTab === 'flash_sale' || activeTab === 'flash_sale_create' || activeTab === 'coupons' || activeTab === 'coupons_create' || activeTab === 'affiliates')
+                : isBusinessGroup
+                ? (activeTab === 'vat_tax' || activeTab === 'delivery_settings' || activeTab === 'payment_settings' || activeTab === 'courier_settings')
+                : isStoreSetupGroup
+                ? (activeTab === 'landing_setup' || activeTab === 'pixel_settings' || activeTab === 'profile')
+                : false;
+
+              const isOpen = isPosGroup ? isPosMenuOpen 
+                : isProductsGroup ? isProductsMenuOpen
+                : isPurchaseGroup ? isPurchaseMenuOpen 
+                : isVendorsGroup ? isVendorsMenuOpen
+                : isSubscriptionsGroup ? isSubscriptionsMenuOpen 
+                : isSuppliersGroup ? isSuppliersMenuOpen 
+                : isDriversGroup ? isDriversMenuOpen 
+                : isMarketingGroup ? isMarketingMenuOpen
+                : isBusinessGroup ? isBusinessMenuOpen
+                : isStoreSetupGroup ? isStoreSetupMenuOpen
+                : true;
+
+              const setOpen = isPosGroup ? setIsPosMenuOpen 
+                : isProductsGroup ? setIsProductsMenuOpen
+                : isPurchaseGroup ? setIsPurchaseMenuOpen 
+                : isVendorsGroup ? setIsVendorsMenuOpen
+                : isSubscriptionsGroup ? setIsSubscriptionsMenuOpen 
+                : isSuppliersGroup ? setIsSuppliersMenuOpen 
+                : isDriversGroup ? setIsDriversMenuOpen 
+                : isMarketingGroup ? setIsMarketingMenuOpen
+                : isBusinessGroup ? setIsBusinessMenuOpen
+                : isStoreSetupGroup ? setIsStoreSetupMenuOpen
+                : () => {};
+              const Icon = item.icon!;
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(prev => !prev);
+                      if (!isGroupActive) setActiveTab(item.subItems[0].id);
+                    }}
+                    className={`w-full inline-flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                      isGroupActive
+                        ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 shadow-2xs'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className={`h-4 w-4 shrink-0 ${isGroupActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                      <span className="truncate font-bold tracking-wide">{item.label}</span>
+                    </div>
+                    {isOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    )}
+                  </button>
+
+                  {isOpen && (
+                    <div className="pl-3 pr-1 py-1 space-y-1 bg-slate-950/40 rounded-xl border border-slate-800/40">
+                      {item.subItems.map((sub: any) => {
+                        const isSubActive = activeTab === sub.id;
+                        return (
+                          <button
+                            key={sub.id}
+                            onClick={() => setActiveTab(sub.id)}
+                            className={`w-full inline-flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                              isSubActive
+                                ? 'bg-emerald-600/90 text-white font-bold shadow-2xs'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/50'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSubActive ? 'bg-emerald-300' : 'bg-slate-600'}`} />
+                            <span className="truncate">{sub.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -419,13 +703,13 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full inline-flex items-center px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all ${
+                className={`w-full inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
                   isActive 
-                    ? 'bg-teal-600 text-white shadow-md shadow-teal-900/30 font-semibold' 
-                    : 'hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-teal-600 text-white shadow-sm font-bold tracking-wide' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className="h-4 w-4 mr-2.5 shrink-0" />
+                <Icon className={`h-4 w-4 mr-2.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                 <span className="truncate">{item.label}</span>
               </button>
             );
@@ -434,8 +718,18 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
 
         {/* Footer info & Logout */}
         <div className="p-3 border-t border-slate-800 space-y-2">
+          {isVendorRole && (
+            <div className="px-2 py-1 bg-emerald-950/40 border border-emerald-800/40 rounded-xl text-center">
+              <span className="text-[10px] text-emerald-400 font-bold block truncate">{vendorStoreName}</span>
+              <span className="text-[9px] text-slate-400 block truncate">{vendorUser?.email || vendorUser?.phone}</span>
+            </div>
+          )}
           <button
-            onClick={onLogout}
+            onClick={() => {
+              localStorage.removeItem('vendor_user');
+              localStorage.removeItem('vendor_token');
+              onLogout();
+            }}
             className="w-full inline-flex items-center justify-center px-3 py-2 bg-slate-800 hover:bg-red-950 hover:text-red-300 text-slate-300 text-xs font-semibold rounded-xl cursor-pointer transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 mr-1.5 shrink-0" />
@@ -477,13 +771,127 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
               </div>
 
               <nav className="flex-1 px-2.5 py-4 space-y-1 overflow-y-auto">
-                {menuItems.map((item) => {
+                {menuItems.map((item: any) => {
                   if (item.isHeader) {
                     return (
                       <div key={item.id} className="pt-4 pb-1 px-3">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                           {item.label}
                         </span>
+                      </div>
+                    );
+                  }
+
+                  if (item.isGroup) {
+                    const isPosGroup = item.id === 'pos_group';
+                    const isProductsGroup = item.id === 'products_group';
+                    const isPurchaseGroup = item.id === 'purchase_group';
+                    const isVendorsGroup = item.id === 'vendors_group';
+                    const isSubscriptionsGroup = item.id === 'subscriptions_group';
+                    const isSuppliersGroup = item.id === 'suppliers_group';
+                    const isDriversGroup = item.id === 'drivers_group';
+                    const isMarketingGroup = item.id === 'marketing_group' || item.id === 'flash_sales_group' || item.id === 'coupons_group';
+                    const isBusinessGroup = item.id === 'business_group';
+                    const isStoreSetupGroup = item.id === 'store_setup_group';
+
+                    const isGroupActive = isPosGroup 
+                      ? (activeTab === 'pos' || activeTab === 'pos_offline_sales' || activeTab === 'pos_drafts')
+                      : isProductsGroup
+                      ? (activeTab === 'products' || activeTab === 'inventory' || activeTab === 'attributes_management' || activeTab === 'units_management' || activeTab === 'category_management' || activeTab === 'sub_category_management' || activeTab === 'brand_management')
+                      : isPurchaseGroup
+                      ? (activeTab === 'purchase_stock_report' || activeTab === 'purchase_create' || activeTab === 'purchase_invoices' || activeTab === 'purchase_summary' || activeTab === 'purchase_returns' || activeTab === 'purchase_return_create')
+                      : isVendorsGroup
+                      ? (activeTab === 'vendors' || activeTab === 'vendors_create' || activeTab === 'vendors_withdrawals')
+                      : isSubscriptionsGroup
+                      ? (activeTab === 'subscriptions' || activeTab === 'subscriptions_create')
+                      : isSuppliersGroup
+                      ? (activeTab === 'suppliers' || activeTab === 'suppliers_create')
+                      : isDriversGroup
+                      ? (activeTab === 'drivers' || activeTab === 'drivers_create')
+                      : isMarketingGroup
+                      ? (activeTab === 'flash_sale' || activeTab === 'flash_sale_create' || activeTab === 'coupons' || activeTab === 'coupons_create' || activeTab === 'affiliates')
+                      : isBusinessGroup
+                      ? (activeTab === 'vat_tax' || activeTab === 'delivery_settings' || activeTab === 'payment_settings' || activeTab === 'courier_settings')
+                      : isStoreSetupGroup
+                      ? (activeTab === 'landing_setup' || activeTab === 'pixel_settings' || activeTab === 'profile')
+                      : false;
+
+                    const isOpen = isPosGroup ? isPosMenuOpen 
+                      : isProductsGroup ? isProductsMenuOpen
+                      : isPurchaseGroup ? isPurchaseMenuOpen 
+                      : isVendorsGroup ? isVendorsMenuOpen
+                      : isSubscriptionsGroup ? isSubscriptionsMenuOpen 
+                      : isSuppliersGroup ? isSuppliersMenuOpen 
+                      : isDriversGroup ? isDriversMenuOpen 
+                      : isMarketingGroup ? isMarketingMenuOpen
+                      : isBusinessGroup ? isBusinessMenuOpen
+                      : isStoreSetupGroup ? isStoreSetupMenuOpen
+                      : true;
+
+                    const setOpen = isPosGroup ? setIsPosMenuOpen 
+                      : isProductsGroup ? setIsProductsMenuOpen
+                      : isPurchaseGroup ? setIsPurchaseMenuOpen 
+                      : isVendorsGroup ? setIsVendorsMenuOpen
+                      : isSubscriptionsGroup ? setIsSubscriptionsMenuOpen 
+                      : isSuppliersGroup ? setIsSuppliersMenuOpen 
+                      : isDriversGroup ? setIsDriversMenuOpen 
+                      : isMarketingGroup ? setIsMarketingMenuOpen
+                      : isBusinessGroup ? setIsBusinessMenuOpen
+                      : isStoreSetupGroup ? setIsStoreSetupMenuOpen
+                      : () => {};
+                    const Icon = item.icon!;
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpen(prev => !prev);
+                            if (!isGroupActive) {
+                              setActiveTab(item.subItems[0].id);
+                              setSidebarOpen(false);
+                            }
+                          }}
+                          className={`w-full inline-flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                            isGroupActive
+                              ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 shadow-2xs'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon className={`h-4 w-4 shrink-0 ${isGroupActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <span className="truncate font-bold tracking-wide">{item.label}</span>
+                          </div>
+                          {isOpen ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          )}
+                        </button>
+
+                        {isOpen && (
+                          <div className="pl-3 pr-1 py-1 space-y-1 bg-slate-950/40 rounded-xl border border-slate-800/40">
+                            {item.subItems.map((sub: any) => {
+                              const isSubActive = activeTab === sub.id;
+                              return (
+                                <button
+                                  key={sub.id}
+                                  onClick={() => {
+                                    setActiveTab(sub.id);
+                                    setSidebarOpen(false);
+                                  }}
+                                  className={`w-full inline-flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                                    isSubActive
+                                      ? 'bg-emerald-600 text-white font-bold shadow-2xs'
+                                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/50'
+                                  }`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSubActive ? 'bg-emerald-300' : 'bg-slate-600'}`} />
+                                  <span className="truncate">{sub.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -526,26 +934,48 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
       </AnimatePresence>
 
       {/* Core Body Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0 bg-[#f8fafc]">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+        <header className="shrink-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-5 sm:px-7 lg:px-8 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center space-x-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 -ml-2 text-slate-600 hover:bg-slate-50 rounded-xl lg:hidden cursor-pointer"
+              className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-xl lg:hidden cursor-pointer"
               title="Open the menu"
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-5 w-5" />
             </button>
 
-            <div className="font-extrabold text-slate-900 text-sm sm:text-base lg:text-lg lg:ml-2">
-              {menuItems.find(m => m.id === activeTab)?.label || 'Dashboard'}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">
+                  {activeTab === 'pos'
+                    ? 'Point of Sale'
+                    : activeTab === 'pos_offline_sales'
+                    ? 'Offline Sales'
+                    : activeTab === 'pos_drafts'
+                    ? 'Draft Orders'
+                    : menuItems.find(m => m.id === activeTab)?.label || 'Dashboard'}
+                </span>
+                {isVendorRole && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Vendor Scoped
+                  </span>
+                )}
+              </div>
+              {(activeTab === 'pos' || activeTab === 'pos_offline_sales' || activeTab === 'pos_drafts') && (
+                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                  {activeTab === 'pos' && 'Ring up a sale, hold it, or take it to payment'}
+                  {activeTab === 'pos_offline_sales' && 'Every sale rung up at this till, and what they came to'}
+                  {activeTab === 'pos_drafts' && 'Counters put aside part-way through, waiting to be picked up again'}
+                </span>
+              )}
             </div>
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-3">
             {/* Live Real-time Sync Indicator */}
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-bold shadow-2xs">
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-bold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>লাইভ সিঙ্ক</span>
             </div>
@@ -555,7 +985,7 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
               type="button"
               onClick={handleToggleOrTestSound}
               title="সাউন্ড নোটিফিকেশন শুনুন ও টেস্ট করুন"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Volume2 className="h-4 w-4 text-teal-600 animate-pulse" />
               <span className="hidden md:inline">অর্ডার সাউন্ড টেস্ট</span>
@@ -568,16 +998,36 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
               onClick={handleManualRefreshOrders}
               disabled={isRefreshingOrders}
               title="নতুন অর্ডার রিফ্রেশ করুন"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${isRefreshingOrders ? 'animate-spin text-teal-600' : ''}`} />
               <span className="hidden sm:inline">{isRefreshingOrders ? 'রিফ্রেশ হচ্ছে...' : 'রিফ্রেশ'}</span>
             </button>
+
+            {/* Admin Profile Pill / Quick Access */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              title="Profile Settings"
+              className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+            >
+              <div className="w-6 h-6 rounded-lg bg-teal-500/15 text-teal-600 border border-teal-500/30 flex items-center justify-center font-bold text-[11px] shrink-0">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <div className="text-left hidden md:block">
+                <div className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[120px]">
+                  {isVendorRole ? vendorStoreName : (adminEmail ? adminEmail.split('@')[0] : 'Admin')}
+                </div>
+                <div className="text-[10px] text-slate-400 font-semibold leading-none">
+                  {isVendorRole ? 'Shop Vendor' : 'Super Admin'}
+                </div>
+              </div>
+            </button>
           </div>
         </header>
 
-        {/* Content canvas */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-6 overflow-y-auto w-full max-w-full">
+        {/* Content canvas (Wider container, crisp typography) */}
+        <main className="flex-1 p-5 sm:p-7 lg:p-8 overflow-y-auto w-full max-w-7xl mx-auto">
           {loading ? (
             <TabContentSkeleton />
           ) : (
@@ -589,6 +1039,26 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
                     orders={orders}
                     customers={customers}
                     onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+                {(activeTab === 'pos' || activeTab === 'pos_offline_sales' || activeTab === 'pos_drafts') && (
+                  <PosView
+                    products={products}
+                    customers={customers}
+                    orders={orders}
+                    onAddOrder={handleAddOrder}
+                    activeSubView={
+                      activeTab === 'pos_offline_sales'
+                        ? 'offline_sales'
+                        : activeTab === 'pos_drafts'
+                        ? 'draft_orders'
+                        : 'new_sale'
+                    }
+                    onSubViewChange={(sub) => {
+                      if (sub === 'offline_sales') setActiveTab('pos_offline_sales');
+                      else if (sub === 'draft_orders') setActiveTab('pos_drafts');
+                      else setActiveTab('pos');
+                    }}
                   />
                 )}
                 {activeTab === 'products' && (
@@ -611,23 +1081,78 @@ export default function AdminDashboard({ adminEmail, onLogout }: AdminDashboardP
                 {activeTab === 'inventory' && (
                   <StockInventoryManager />
                 )}
+                {(activeTab === 'purchase_stock_report' || activeTab === 'purchase_create' || activeTab === 'purchase_invoices' || activeTab === 'purchase_summary' || activeTab === 'purchase_returns' || activeTab === 'purchase_return_create') && (
+                  <PurchaseManager 
+                    initialSubTab={
+                      activeTab === 'purchase_create' ? 'add_purchase' :
+                      activeTab === 'purchase_invoices' ? 'invoices' :
+                      activeTab === 'purchase_summary' ? 'summary' :
+                      activeTab === 'purchase_returns' ? 'returns' :
+                      activeTab === 'purchase_return_create' ? 'add_return' :
+                      'stock_report'
+                    }
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                    products={products}
+                  />
+                )}
                 {activeTab === 'customers' && (
                   <CustomerManager 
                     customers={customers}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
                   />
                 )}
-                {activeTab === 'coupons' && (
-                  <CouponManager />
+                {(activeTab === 'vendors' || activeTab === 'vendors_create' || activeTab === 'vendors_withdrawals') && (
+                  <VendorManager 
+                    initialView={activeTab === 'vendors_create' ? 'create' : activeTab === 'vendors_withdrawals' ? 'withdrawals' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
                 )}
-                {activeTab === 'category_management' && (
-                  <CategoryManager />
+                {(activeTab === 'subscriptions' || activeTab === 'subscriptions_create') && (
+                  <SubscriptionManager 
+                    initialView={activeTab === 'subscriptions_create' ? 'create' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+                {(activeTab === 'suppliers' || activeTab === 'suppliers_create') && (
+                  <SupplierManager 
+                    initialView={activeTab === 'suppliers_create' ? 'create' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+                {(activeTab === 'drivers' || activeTab === 'drivers_create') && (
+                  <DriverManager 
+                    initialView={activeTab === 'drivers_create' ? 'create' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+                {activeTab === 'affiliates' && (
+                  <AffiliateManager />
+                )}
+                {(activeTab === 'coupons' || activeTab === 'coupons_create') && (
+                  <CouponManager 
+                    initialView={activeTab === 'coupons_create' ? 'create' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+                {(activeTab === 'category_management' || activeTab === 'sub_category_management') && (
+                  <CategoryManager 
+                    initialSubcategoryFocus={activeTab === 'sub_category_management'} 
+                  />
                 )}
                 {activeTab === 'brand_management' && (
                   <BrandManager />
                 )}
-                {activeTab === 'flash_sale' && (
+                {activeTab === 'attributes_management' && (
+                  <AttributesManager />
+                )}
+                {activeTab === 'units_management' && (
+                  <UnitsManager />
+                )}
+                {(activeTab === 'flash_sale' || activeTab === 'flash_sale_create') && (
                   <FlashSaleManager 
                     products={products}
+                    initialView={activeTab === 'flash_sale_create' ? 'create' : 'list'}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
                   />
                 )}
                 {activeTab === 'landing_setup' && (

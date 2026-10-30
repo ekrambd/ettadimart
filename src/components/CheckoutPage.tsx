@@ -17,6 +17,7 @@ import { trackEvent, createEventId } from '../lib/pixelGtmService';
 import { playOrderSuccessVibe } from '../lib/soundUtils';
 import { validateBDPhone, validateDeliveryAddress, sanitizeBDPhoneInput } from '../lib/validationUtils';
 import { calculateDeliveryCharge } from '../lib/deliveryUtils';
+import { useAppStore } from '../store/useAppStore';
 
 interface CartItem {
   product: Product;
@@ -71,9 +72,25 @@ export default function CheckoutPage({
   }, [ecomSettings]);
 
   // Cart Calculations
+  const currentCustomer = useAppStore(state => state.currentCustomer);
+  const isWholesaler = currentCustomer?.customerType === 'wholesaler';
+
+  const getItemEffectivePrice = (item: CartItem) => {
+    if (
+      isWholesaler &&
+      item.product.isWholesaleAvailable &&
+      item.product.wholesalePrice != null &&
+      item.product.wholesalePrice > 0 &&
+      item.quantity >= (item.product.minOrderQty || 1)
+    ) {
+      return Number(item.product.wholesalePrice);
+    }
+    return item.variant?.price ?? item.product.price;
+  };
+
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((acc, item) => acc + ((item.variant?.price ?? item.product.price) * item.quantity), 0);
-  }, [cart]);
+    return cart.reduce((acc, item) => acc + (getItemEffectivePrice(item) * item.quantity), 0);
+  }, [cart, isWholesaler]);
 
   const totalItemCount = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -511,6 +528,11 @@ export default function CheckoutPage({
                             <h4 className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
                               {title}
                             </h4>
+                            {item.product.vendorName && (
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                Seller: <span className="text-slate-600 font-semibold">{item.product.vendorName}</span>
+                              </p>
+                            )}
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
                               ৳{unitPrice.toLocaleString()}
                             </p>

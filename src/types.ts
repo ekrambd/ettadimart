@@ -30,6 +30,8 @@ export interface Product {
   subCategory?: string;
   brand?: string;
   brandId?: string;
+  vendorId?: string;
+  vendorName?: string;
   stock?: number;
   openingStock?: number;
   receivedStock?: number;
@@ -52,6 +54,14 @@ export interface Product {
   viewsCount?: number;
 
   // Additional publishing, identity & pricing fields from admin panel
+  unit?: string;
+  minOrderQty?: number;
+  maxOrderQty?: number;
+  wholesalePrice?: number;
+  paikariPrice?: number;
+  isWholesaleAvailable?: boolean;
+  isFeatured?: boolean;
+  selectedAttributes?: Record<string, string[]>;
   productType?: string;
   translation?: string;
   barcode?: string;
@@ -75,7 +85,6 @@ export interface Product {
   isFlashSale?: boolean;
   flashPrice?: number;
   isPrivate?: boolean;
-  isFeatured?: boolean;
   isCampaign?: boolean;
   isNewArrival?: boolean;
   isOneTimePurchase?: boolean;
@@ -136,10 +145,16 @@ export interface SubCategoryItem {
 export interface CategoryItem {
   id: string;
   name: string;
+  slug?: string;
+  parentId?: string | null;
+  description?: string;
+  isActive?: boolean;
   order?: number;
   image?: string;
   icon?: string;
   subcategories?: SubCategoryItem[];
+  productCount?: number;
+  children?: CategoryItem[];
 }
 
 export interface PromoCardItem {
@@ -513,7 +528,10 @@ export interface Customer {
   name: string;
   phone: string;
   email?: string;
+  image?: string;
   couponDiscount?: number;
+  customerType?: 'regular' | 'wholesaler';
+  notes?: string;
 
   address?: string;
   district?: string;
@@ -594,6 +612,12 @@ export interface Coupon {
   minSpent?: number;
   usageLimit?: number;
   usageCount: number;
+  startDate?: string;
+  startTime?: string;
+  expiredDate?: string;
+  expiredTime?: string;
+  limitPerUser?: number;
+  shopId?: string;
   endDate?: string;
   type: 'fixed' | 'percentage';
   status: 'Active' | 'Inactive';
@@ -627,7 +651,164 @@ export interface Brand {
   updatedAt?: string;
 }
 
-export type ActiveTab = 'dashboard' | 'products' | 'orders' | 'customers' | 'coupons' | 'inventory' | 'category_management' | 'brand_management' | 'flash_sale' | 'highlight_spotlight' | 'about_settings' | 'landing_setup' | 'payment_settings' | 'delivery_settings' | 'pixel_settings' | 'courier_settings' | 'profile' | 'points';
+export type ActiveTab = 'dashboard' | 'pos' | 'pos_offline_sales' | 'pos_drafts' | 'products' | 'orders' | 'customers' | 'coupons' | 'coupons_create' | 'inventory' | 'purchase_stock_report' | 'purchase_create' | 'purchase_invoices' | 'purchase_summary' | 'purchase_returns' | 'purchase_return_create' | 'suppliers' | 'suppliers_create' | 'drivers' | 'drivers_create' | 'flash_sale' | 'flash_sale_create' | 'subscriptions' | 'subscriptions_create' | 'affiliates' | 'vendors' | 'vendors_create' | 'vendors_withdrawals' | 'category_management' | 'sub_category_management' | 'brand_management' | 'attributes_management' | 'units_management' | 'business_setup' | 'vat_tax' | 'highlight_spotlight' | 'about_settings' | 'landing_setup' | 'payment_settings' | 'delivery_settings' | 'pixel_settings' | 'courier_settings' | 'profile' | 'points';
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  shortDescription?: string;
+  description?: string;
+  price: number;
+  durationDays: number;
+  sellLimit?: number;
+  isPopular: boolean;
+  status: boolean;
+  targetAudience?: 'vendor' | 'customer';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FlashSaleItem {
+  id: string;
+  name: string;
+  minimumDiscount: number;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  description: string;
+  thumbnail?: string;
+  status: boolean;
+  productIds?: string[] | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Driver {
+  id: string;
+  firstName: string;
+  lastName?: string;
+  phone: string;
+  email?: string;
+  profilePhoto?: string;
+  gender?: 'Male' | 'Female' | 'Other';
+  dateOfBirth?: string;
+  drivingLicense?: string;
+  vehicleType?: string;
+  password?: string;
+  status: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Vendor {
+  id: string;
+  storeName: string;
+  slug: string;
+  firstName?: string;
+  lastName?: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  gender?: string;
+  password?: string;
+  logo?: string;
+  banner?: string;
+  ownerPhoto?: string;
+  description?: string;
+  commissionRate?: number; // e.g. 8 for 8% marketplace commission
+  deliveryCharge?: number;
+  orderPrefix?: string;
+  productsCount?: number;
+  ordersCount?: number;
+  totalSales: number;
+  totalOrders?: number;
+  walletBalance: number;
+  totalWithdrawn: number;
+  isOpen?: boolean;
+  status: 'active' | 'pending' | 'suspended';
+  payoutMethod?: string;
+  payoutAccount?: string;
+  district?: string;
+  address?: string;
+  rating?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductAttribute {
+  id: string;
+  name: string;
+  values: string[];
+  status?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductUnit {
+  id: string;
+  name: string;
+  code: string;
+  status?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WithdrawalRequest {
+  id: string;
+  vendorId: string;
+  amount: number;
+  method?: string;
+  accountNumber?: string;
+  contactNumber?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  notes?: string;
+  requestedAt?: string;
+  decidedAt?: string;
+  vendorName?: string;
+  ownerName?: string;
+  vendorEmail?: string;
+  vendorPhone?: string;
+  vendorLogo?: string;
+  vendorAddress?: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  profilePhoto?: string;
+  address?: string;
+  purchasesCount?: number;
+  totalPurchasedAmount?: number;
+  balance?: number;
+  status?: boolean | 'active' | 'inactive';
+  companyName?: string;
+  suppliedProducts?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Affiliate {
+  id: string;
+  name: string;
+  email?: string;
+  phone: string;
+  referralCode: string;
+  commissionRate: number; // e.g. 5 for 5%
+  commissionType: 'percentage' | 'flat';
+  totalEarnings: number;
+  totalWithdrawn: number;
+  balance: number;
+  totalOrdersCount: number;
+  status: 'active' | 'pending' | 'suspended';
+  payoutMethod?: string;
+  payoutNumber?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface ContactMessage {
   id: string;
@@ -673,4 +854,13 @@ export interface PointFaqItem {
   id: string;
   question: string;
   answer: string;
+}
+
+export interface TaxItem {
+  id: string;
+  name: string;
+  percentage: number;
+  status: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }

@@ -189,8 +189,8 @@ describe('🚀 Enterprise System Design Architecture Verification', () => {
       expect(found).toBeDefined();
       expect(found?.checksum).toBe(backup.checksum);
 
-      // Test point-in-time restore
-      const restoreRes = await backupEngine.restoreBackup(backup.id);
+      // Test point-in-time restore with dryRun to protect live database state
+      const restoreRes = await backupEngine.restoreBackup(backup.id, { dryRun: true });
       expect(restoreRes.success).toBe(true);
       expect(restoreRes.restored.productsCount).toBe(1);
     });

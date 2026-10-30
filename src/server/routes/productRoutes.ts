@@ -107,6 +107,8 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
   if (data.subCategory !== undefined) res.subCategory = data.subCategory ? String(data.subCategory) : null;
   if (data.brand !== undefined) res.brand = data.brand ? String(data.brand) : null;
   if (data.brandId !== undefined) res.brandId = data.brandId ? String(data.brandId) : null;
+  if (data.vendorId !== undefined) res.vendorId = data.vendorId ? String(data.vendorId) : null;
+  if (data.vendorName !== undefined) res.vendorName = data.vendorName ? String(data.vendorName) : null;
   if (data.stock !== undefined || !isUpdate) res.stock = toInt(data.stock) ?? 0;
   if (data.isAvailable !== undefined) res.isAvailable = data.isAvailable !== false;
   if (data.description !== undefined) res.description = data.description ? String(data.description) : null;
@@ -123,6 +125,15 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
   if (data.authorName !== undefined) res.authorName = data.authorName ? String(data.authorName) : null;
   if (data.pdfUrl !== undefined) res.pdfUrl = data.pdfUrl ? String(data.pdfUrl) : null;
   if (data.slug !== undefined) res.slug = data.slug ? String(data.slug) : null;
+  if (data.unit !== undefined) res.unit = data.unit ? String(data.unit) : null;
+  if (data.minOrderQty !== undefined) res.minOrderQty = toInt(data.minOrderQty) ?? 1;
+  if (data.maxOrderQty !== undefined) res.maxOrderQty = toInt(data.maxOrderQty);
+  if (data.wholesalePrice !== undefined || data.paikariPrice !== undefined) {
+    res.wholesalePrice = toNum(data.wholesalePrice ?? data.paikariPrice);
+  }
+  if (data.isWholesaleAvailable !== undefined) res.isWholesaleAvailable = Boolean(data.isWholesaleAvailable);
+  if (data.isFeatured !== undefined) res.isFeatured = Boolean(data.isFeatured);
+  if (data.selectedAttributes !== undefined) res.selectedAttributes = toStr(data.selectedAttributes);
 
   // Preserve deliveryChargeEnabled, freeDelivery, codAvailable and publishing metadata in features JSON column
   const meta: Record<string, any> = {};

@@ -9,7 +9,7 @@ import {
   POPULAR_SEARCH_KEYWORDS, 
   SKIN_CONCERN_TABS 
 } from '../lib/searchIndex';
-import { FantineProductItem } from './FantineStorePage';
+import { FantineProductItem } from './EttadiStorePage';
 
 interface AdvancedSearchModalProps {
   isOpen: boolean;

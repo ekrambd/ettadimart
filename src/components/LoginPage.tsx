@@ -1,6 +1,7 @@
 import React from 'react';
 import SimpleAuth from './SimpleAuth';
 import AdminLogin from './AdminLogin';
+import ShopLoginPage from './ShopLoginPage';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useLocation } from 'react-router-dom';
@@ -13,6 +14,13 @@ interface LoginPageProps {
 export default function LoginPage({ onLoginSuccess, onNavigateHome }: LoginPageProps) {
   const location = useLocation();
   const isAdminPath = location.pathname.toLowerCase().includes('/admin');
+  const isShopPath = location.pathname.toLowerCase().includes('/shop');
+
+  if (isAdminPath || isShopPath) {
+    return (
+      <ShopLoginPage onLoginSuccess={onLoginSuccess} />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -29,11 +37,7 @@ export default function LoginPage({ onLoginSuccess, onNavigateHome }: LoginPageP
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-[420px]"
       >
-        {isAdminPath ? (
-          <AdminLogin onSuccess={onLoginSuccess} />
-        ) : (
-          <SimpleAuth onSuccess={onLoginSuccess} />
-        )}
+        <SimpleAuth onSuccess={onLoginSuccess} />
       </motion.div>
     </div>
   );

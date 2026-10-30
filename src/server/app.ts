@@ -19,6 +19,15 @@ import { brandRouter } from './routes/brandRoutes';
 import { contactRouter } from './routes/contactRoutes';
 import { landingRouter } from './routes/landingRoutes';
 import { instituteRouter } from './routes/instituteRoutes';
+import { taxRouter } from './routes/taxRoutes';
+import { driverRouter } from './routes/driverRoutes';
+import { supplierRouter } from './routes/supplierRoutes';
+import { flashSaleRouter } from './routes/flashSaleRoutes';
+import { subscriptionRouter } from './routes/subscriptionRoutes';
+import { vendorRouter } from './routes/vendorRoutes';
+import { attributeRouter } from './routes/attributeRoutes';
+import { unitRouter } from './routes/unitRoutes';
+import { purchaseRouter } from './routes/purchaseRoutes';
 import { imageRouter } from './routes/imageCDN';
 
 import { globalCache } from './services/cacheEngine';
@@ -126,6 +135,15 @@ app.use('/api/brands', brandRouter);
 app.use('/api/contact-messages', contactRouter);
 app.use('/api/landing-pages', landingRouter);
 app.use('/api/institute', instituteRouter);
+app.use('/api/taxes', taxRouter);
+app.use('/api/drivers', driverRouter);
+app.use('/api/suppliers', supplierRouter);
+app.use('/api/flash-sales', flashSaleRouter);
+app.use('/api/subscriptions', subscriptionRouter);
+app.use('/api/vendors', vendorRouter);
+app.use('/api/attributes', attributeRouter);
+app.use('/api/units', unitRouter);
+app.use('/api/purchases', purchaseRouter);
 app.use('/cdn', imageRouter);
 
 // Local media static file serving

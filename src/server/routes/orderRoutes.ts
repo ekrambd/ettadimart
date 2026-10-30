@@ -183,6 +183,12 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
     }
 
     // 1. Authoritative DB Price Check
+    const cleanPhone = phoneVal.cleanedPhone;
+    const existingCustomer = await prisma.customer.findUnique({
+      where: { phone: cleanPhone }
+    });
+    const isWholesalerCustomer = existingCustomer?.customerType === 'wholesaler';
+
     const productIds = items.map((i: any) => i.productId || i.product?.id || i.id).filter(Boolean);
     const dbProducts = await prisma.product.findMany({
       where: { id: { in: productIds } }
@@ -197,7 +203,26 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
       const quantity = Math.max(1, parseInt(item.quantity || 1, 10));
 
       const matchedProduct = productLookupMap.get(productId);
-      const unitPrice = matchedProduct ? Number(matchedProduct.price || 0) : Number(item.price || item.product?.price || 0);
+      
+      // Determine Wholesale vs Retail Pricing & Quantity Rules
+      const canGetWholesale = isWholesalerCustomer && 
+        matchedProduct?.isWholesaleAvailable && 
+        matchedProduct.wholesalePrice != null && 
+        matchedProduct.wholesalePrice > 0 &&
+        quantity >= (matchedProduct.minOrderQty || 1);
+
+      // Enforce maxOrderQty if configured
+      if (matchedProduct?.maxOrderQty && matchedProduct.maxOrderQty > 0 && quantity > matchedProduct.maxOrderQty) {
+        return res.status(400).json({ 
+          error: `Product "${matchedProduct.title}" cannot be ordered in quantity greater than ${matchedProduct.maxOrderQty}.` 
+        });
+      }
+
+      let unitPrice = matchedProduct ? Number(matchedProduct.price || 0) : Number(item.price || item.product?.price || 0);
+      if (canGetWholesale && matchedProduct) {
+        unitPrice = Number(matchedProduct.wholesalePrice);
+      }
+
       const regularPrice = matchedProduct ? Number(matchedProduct.regularPrice || unitPrice) : Number(item.regularPrice || unitPrice);
       const title = matchedProduct?.title || item.product?.title || item.title || 'Product';
 
@@ -208,10 +233,13 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
           title,
           price: unitPrice,
           regularPrice,
+          wholesalePrice: matchedProduct?.wholesalePrice,
+          isWholesalePriceApplied: canGetWholesale,
           image: matchedProduct?.image || item.product?.image || item.product?.coverImage || '',
           category: matchedProduct?.category || item.product?.category || ''
         },
-        quantity
+        quantity,
+        isWholesale: canGetWholesale
       });
     }
 
@@ -278,6 +306,39 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
     const formatted = formatOrder(createdOrder);
     broadcastNewOrder(formatted);
 
+    // Sync Customer in DB automatically upon order placement
+    try {
+      const cleanPhone = phoneVal.cleanedPhone;
+      const custOrders = await prisma.order.findMany({ where: { phone: cleanPhone } });
+      const totalOrdersCount = custOrders.length;
+      const totalSpentCalc = custOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+      await prisma.customer.upsert({
+        where: { phone: cleanPhone },
+        update: {
+          name: String(customerName).trim(),
+          address: addressVal.cleanedAddress,
+          district: deliveryZone || undefined,
+          email: email ? String(email).trim() : undefined,
+          totalOrders: totalOrdersCount,
+          totalSpent: totalSpentCalc
+        },
+        create: {
+          id: `cust-${cleanPhone}`,
+          name: String(customerName).trim(),
+          phone: cleanPhone,
+          address: addressVal.cleanedAddress,
+          district: deliveryZone || undefined,
+          email: email ? String(email).trim() : null,
+          totalOrders: totalOrdersCount,
+          totalSpent: totalSpentCalc,
+          customerType: 'regular'
+        }
+      });
+    } catch (custErr) {
+      console.warn('Auto-sync customer error after order:', custErr);
+    }
+
     return res.status(201).json({
       success: true,
       order: formatted
@@ -331,6 +392,42 @@ orderRouter.post('/', checkoutRateLimiter, async (req, res) => {
 
     const formatted = formatOrder(created);
     broadcastNewOrder(formatted);
+
+    // Sync Customer in DB automatically upon admin manual order creation
+    if (rawPhone) {
+      try {
+        const cleanPhone = String(rawPhone).trim().replace(/\s+/g, '');
+        const custOrders = await prisma.order.findMany({ where: { phone: cleanPhone } });
+        const totalOrdersCount = custOrders.length;
+        const totalSpentCalc = custOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+        await prisma.customer.upsert({
+          where: { phone: cleanPhone },
+          update: {
+            name: req.body.customerName || req.body.name || undefined,
+            address: rawAddress || undefined,
+            district: req.body.district || undefined,
+            email: req.body.email || undefined,
+            totalOrders: totalOrdersCount,
+            totalSpent: totalSpentCalc
+          },
+          create: {
+            id: `cust-${cleanPhone}`,
+            name: req.body.customerName || req.body.name || 'Customer',
+            phone: cleanPhone,
+            address: rawAddress || null,
+            district: req.body.district || null,
+            email: req.body.email || null,
+            totalOrders: totalOrdersCount,
+            totalSpent: totalSpentCalc,
+            customerType: 'regular'
+          }
+        });
+      } catch (custErr) {
+        console.warn('Auto-sync customer error after manual order:', custErr);
+      }
+    }
+
     res.status(201).json(formatted);
   } catch (error) {
     console.error('Failed to create order in DB:', error);

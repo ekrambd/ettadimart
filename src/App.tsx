@@ -6,10 +6,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 const LoginPage = lazy(() => import('./components/LoginPage'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const ShopLoginPage = lazy(() => import('./components/ShopLoginPage'));
+const ShopsListPage = lazy(() => import('./components/ShopsListPage'));
+const ShopProfilePage = lazy(() => import('./components/ShopProfilePage'));
 
 const loadBookLandingPage = () => import('./components/BookLandingPage');
 const BookLandingPage = lazy(loadBookLandingPage);
-const FantineStorePage = lazy(() => import('./components/FantineStorePage'));
+const EttadiStorePage = lazy(() => import('./components/EttadiStorePage'));
 
 // Fix: Only preload landing page chunk if visiting a known landing path
 if (typeof window !== 'undefined') {
@@ -169,20 +172,23 @@ function AppRoutes() {
         <main className="flex-1 w-full">
           <Routes>
             <Route path="/" element={
-              <FantineStorePage
+              <EttadiStorePage
                 onGoToLogin={() => navigate('/login')}
                 onGoToLanding={() => navigate('/book')}
               />
             } />
             
             {/* Proper SEO setup: Core app sections continue rendering the app */}
-            <Route path="/shop" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/contact" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/about" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/quiz" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/checkout" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/product/:slug" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
-            <Route path="/product/:slug/:id" element={<FantineStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/shop" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/shops" element={<ShopsListPage onGoToShop={(s) => navigate(`/shops/${s}`)} />} />
+            <Route path="/shops/:slug" element={<ShopProfilePage />} />
+            <Route path="/shop/login" element={<ShopLoginPage onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="/contact" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/about" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/quiz" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/checkout" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/product/:slug" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/product/:slug/:id" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
             <Route path="/fantine" element={<Navigate to="/" replace />} />
             
             {/* Fix Duplicate Content: Canonical Redirects for legacy .html routes */}

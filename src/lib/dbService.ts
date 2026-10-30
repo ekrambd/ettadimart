@@ -15,7 +15,7 @@ const startAfter = (..._args: any[]): any => ({});
 const deleteField = (..._args: any[]): any => null;
 const onSnapshot = (..._args: any[]): any => (() => {});
 
-import { BookOrder, Product, EcomSettings, Customer, PaymentGatewayItem, DeliveryMethodItem, Coupon, LandingPageData, InstituteInfo, Review, Brand, ContactMessage } from '../types';
+import { BookOrder, Product, EcomSettings, Customer, PaymentGatewayItem, DeliveryMethodItem, Coupon, LandingPageData, InstituteInfo, Review, Brand, ContactMessage, Supplier, Affiliate, Vendor, TaxItem, CategoryItem, ProductAttribute, ProductUnit, FlashSaleItem, SubscriptionPlan, Driver, WithdrawalRequest } from '../types';
 import { ApiClient } from '../services/apiClient';
 
 function stripIntegrationSecrets(settings: EcomSettings): EcomSettings {
@@ -919,34 +919,93 @@ export const dbService = {
     window.dispatchEvent(new Event('ecom-settings-updated'));
   },
 
-  // --- Customers List (Derived from Orders) ---
+  // --- Customers List (Merged from Server DB, Registered Customers & Orders) ---
   async getCustomers(): Promise<Customer[]> {
     const orders = await this.getBookOrders();
     this._ordersCache = null; // invalidate cache
     const customerMap = new Map<string, Customer>();
 
+    // 1. Fetch from Server DB (/api/customers)
+    try {
+      const res = await fetch('/api/customers');
+      if (res.ok) {
+        const dbCusts: Customer[] = await res.json();
+        if (Array.isArray(dbCusts)) {
+          dbCusts.forEach(c => {
+            const phoneKey = (c.phone || '').replace(/[\s\-\+]/g, '').slice(-11);
+            if (!phoneKey) return;
+            customerMap.set(phoneKey, {
+              ...c,
+              totalOrders: c.totalOrders || 0,
+              totalSpent: c.totalSpent || 0,
+              lastOrderDate: c.lastOrderDate || c.createdAt || new Date().toISOString(),
+              customerType: c.customerType || 'regular',
+              orders: []
+            });
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching customers from /api/customers:', e);
+    }
+
+    // 2. Fetch from Local registered customers
+    const localRegistered = getLocalData<Customer[]>('noor_registered_customers', []);
+    localRegistered.forEach(c => {
+      const phoneKey = (c.phone || '').replace(/[\s\-\+]/g, '').slice(-11);
+      if (!phoneKey) return;
+      const existing = customerMap.get(phoneKey);
+      if (existing) {
+        customerMap.set(phoneKey, {
+          ...existing,
+          ...c,
+          customerType: c.customerType || existing.customerType || 'regular',
+          image: c.image || existing.image,
+          notes: c.notes || existing.notes,
+        });
+      } else {
+        customerMap.set(phoneKey, {
+          ...c,
+          totalOrders: c.totalOrders || 0,
+          totalSpent: c.totalSpent || 0,
+          lastOrderDate: c.lastOrderDate || c.createdAt || new Date().toISOString(),
+          customerType: c.customerType || 'regular',
+          orders: []
+        });
+      }
+    });
+
+    // 3. Aggregate Orders history into customers
     orders.forEach(ord => {
       const phoneKey = (ord.phone || '').replace(/[\s\-\+]/g, '').slice(-11); // normalize Bangladeshi phone
       if (!phoneKey) return;
 
       const existing = customerMap.get(phoneKey);
       if (existing) {
-        existing.totalOrders += 1;
-        existing.totalSpent += ord.totalPrice || 0;
+        if (!existing.orders) existing.orders = [];
         existing.orders.push(ord);
-        if (new Date(ord.createdAt).getTime() > new Date(existing.lastOrderDate).getTime()) {
+        existing.totalOrders = (existing.totalOrders || 0) + 1;
+        existing.totalSpent = (existing.totalSpent || 0) + (ord.totalPrice || 0);
+        if (!existing.lastOrderDate || new Date(ord.createdAt).getTime() > new Date(existing.lastOrderDate).getTime()) {
           existing.lastOrderDate = ord.createdAt;
-          existing.name = ord.customerName || existing.name;
-          existing.address = ord.address || existing.address;
-          existing.district = ord.district || existing.district;
+          if (!existing.name || existing.name === 'customer') {
+            existing.name = ord.customerName || existing.name;
+          }
+          if (!existing.address) {
+            existing.address = ord.address || existing.address;
+          }
+          if (!existing.district) {
+            existing.district = ord.district || existing.district;
+          }
         }
       } else {
         customerMap.set(phoneKey, {
           id: `cust-${phoneKey}`,
-          name: ord.customerName || 'customer',
+          name: ord.customerName || 'Customer',
           phone: ord.phone,
           address: ord.address || '',
           district: ord.district || '',
+          customerType: 'regular',
           totalOrders: 1,
           totalSpent: ord.totalPrice || 0,
           lastOrderDate: ord.createdAt,
@@ -955,7 +1014,7 @@ export const dbService = {
       }
     });
 
-    return Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+    return Array.from(customerMap.values()).sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0));
   },
 
   // --- Customer Authentication & Lookup ---
@@ -1054,6 +1113,18 @@ export const dbService = {
   },
 
   async saveCustomer(customer: Customer): Promise<void> {
+    // 1. Sync to Server DB
+    try {
+      await fetch('/api/customers', {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(customer)
+      });
+    } catch (e) {
+      console.warn('Failed to save customer to /api/customers:', e);
+    }
+
+    // 2. Sync to Firebase if enabled
     if (isFirebaseEnabled && db) {
       try {
         const sanitized = sanitizeForFirestore(customer);
@@ -1063,9 +1134,31 @@ export const dbService = {
       }
     }
 
+    // 3. Sync to localStorage
     const customers = getLocalData<Customer[]>('noor_registered_customers', []);
-    const updated = [customer, ...customers.filter(c => c.id !== customer.id)];
+    const updated = [customer, ...customers.filter(c => c.id !== customer.id && c.phone !== customer.phone)];
     setLocalData('noor_registered_customers', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('customers-updated', { detail: customer }));
+    }
+  },
+
+  async deleteCustomer(idOrPhone: string): Promise<void> {
+    try {
+      await fetch(`/api/customers/${encodeURIComponent(idOrPhone)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch (e) {
+      console.warn('Failed to delete customer on server:', e);
+    }
+
+    const customers = getLocalData<Customer[]>('noor_registered_customers', []);
+    const updated = customers.filter(c => c.id !== idOrPhone && c.phone !== idOrPhone);
+    setLocalData('noor_registered_customers', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('customers-updated'));
+    }
   },
 
   async getOrdersByPhone(phone: string): Promise<BookOrder[]> {
@@ -1386,11 +1479,18 @@ export const dbService = {
     };
 
     try {
-      await fetch('/api/brands', {
-        method: 'POST',
+      const isExisting = brand.id && (await this.getBrands()).some(b => b.id === brand.id);
+      const url = isExisting ? `/api/brands/${encodeURIComponent(brand.id)}` : '/api/brands';
+      const method = isExisting ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: getAdminAuthHeaders(),
         body: JSON.stringify(finalBrand)
       });
+      if (!res.ok) {
+        console.warn(`Server ${method} /api/brands responded with ${res.status}`);
+      }
     } catch (e) {
       console.warn('Failed saving brand to server API:', e);
     }
@@ -1442,6 +1542,841 @@ export const dbService = {
     setLocalData('noor_brands', updated);
     window.dispatchEvent(new CustomEvent('brands-updated', { detail: updated }));
     window.dispatchEvent(new CustomEvent('ecom-brands-updated', { detail: updated }));
+  },
+
+  // ===== SUPPLIER MANAGEMENT =====
+  async getSuppliers(filter?: { search?: string; status?: string }): Promise<Supplier[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.search) params.append('search', filter.search);
+      if (filter?.status) params.append('status', filter.status);
+      const url = `/api/suppliers${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_suppliers', data);
+          return data;
+        }
+      }
+    } catch {}
+    const list = getLocalData<Supplier[]>('noor_suppliers', []);
+    return list;
+  },
+
+  async saveSupplier(supplier: Supplier): Promise<Supplier> {
+    const finalSupplier: Supplier = {
+      ...supplier,
+      id: supplier.id || `supp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      status: supplier.status !== undefined ? supplier.status : true,
+      createdAt: supplier.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      const isExisting = supplier.id && !supplier.id.startsWith('temp-') && (await this.getSuppliers()).some(s => s.id === supplier.id);
+      const url = isExisting ? `/api/suppliers/${encodeURIComponent(supplier.id)}` : '/api/suppliers';
+      const method = isExisting ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(finalSupplier)
+      });
+      if (!res.ok) {
+        console.warn(`Server ${method} ${url} responded with ${res.status}`);
+      }
+    } catch (e) {
+      console.warn('Failed saving supplier to server API:', e);
+    }
+
+    const current = await this.getSuppliers();
+    const existingIndex = current.findIndex(s => s.id === finalSupplier.id);
+    let updated: Supplier[];
+    if (existingIndex >= 0) {
+      updated = [...current];
+      updated[existingIndex] = finalSupplier;
+    } else {
+      updated = [finalSupplier, ...current];
+    }
+    setLocalData('noor_suppliers', updated);
+    window.dispatchEvent(new CustomEvent('suppliers-updated', { detail: updated }));
+    return finalSupplier;
+  },
+
+  async deleteSupplier(id: string): Promise<void> {
+    try {
+      await fetch(`/api/suppliers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getSuppliers();
+    const updated = current.filter(s => s.id !== id);
+    setLocalData('noor_suppliers', updated);
+    window.dispatchEvent(new CustomEvent('suppliers-updated', { detail: updated }));
+  },
+
+  // ===== AFFILIATE MANAGEMENT =====
+  async getAffiliates(): Promise<Affiliate[]> {
+    try {
+      const res = await fetch('/api/affiliates');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_affiliates', data);
+          return data;
+        }
+      }
+    } catch {}
+    const list = getLocalData<Affiliate[]>('noor_affiliates', []);
+    return list;
+  },
+
+  async saveAffiliate(affiliate: Affiliate): Promise<Affiliate> {
+    const finalAffiliate: Affiliate = {
+      ...affiliate,
+      id: affiliate.id || `aff-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      createdAt: affiliate.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await fetch('/api/affiliates', {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(finalAffiliate)
+      });
+    } catch {}
+
+    const current = await this.getAffiliates();
+    const existingIndex = current.findIndex(a => a.id === finalAffiliate.id);
+    let updated: Affiliate[];
+    if (existingIndex >= 0) {
+      updated = [...current];
+      updated[existingIndex] = finalAffiliate;
+    } else {
+      updated = [finalAffiliate, ...current];
+    }
+    setLocalData('noor_affiliates', updated);
+    window.dispatchEvent(new CustomEvent('affiliates-updated', { detail: updated }));
+    return finalAffiliate;
+  },
+
+  async deleteAffiliate(id: string): Promise<void> {
+    try {
+      await fetch(`/api/affiliates/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getAffiliates();
+    const updated = current.filter(a => a.id !== id);
+    setLocalData('noor_affiliates', updated);
+    window.dispatchEvent(new CustomEvent('affiliates-updated', { detail: updated }));
+  },
+
+  // ===== CATEGORY HIERARCHY SYSTEM =====
+  async getCategories(): Promise<CategoryItem[]> {
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            slug: item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            parentId: item.parentId || null,
+            description: item.description || '',
+            isActive: item.isActive !== false,
+            order: item.order || 0,
+            image: item.image || '',
+            icon: item.icon || '',
+            subcategories: item.subcategories ? (typeof item.subcategories === 'string' ? JSON.parse(item.subcategories) : item.subcategories) : []
+          }));
+          setLocalData('noor_category_items', mapped);
+          return mapped;
+        }
+      }
+    } catch {}
+
+    return getLocalData<CategoryItem[]>('noor_category_items', []);
+  },
+
+  async saveCategory(cat: Partial<CategoryItem>): Promise<CategoryItem> {
+    const isEdit = Boolean(cat.id);
+    const id = cat.id || `cat-${Date.now()}`;
+    const payload: CategoryItem = {
+      id,
+      name: cat.name || 'New Category',
+      slug: cat.slug || (cat.name || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      parentId: cat.parentId || null,
+      description: cat.description || '',
+      isActive: cat.isActive !== undefined ? cat.isActive : true,
+      order: cat.order !== undefined ? cat.order : 0,
+      image: cat.image || '',
+      icon: cat.icon || '',
+      subcategories: cat.subcategories || []
+    };
+
+    try {
+      await fetch(isEdit ? `/api/categories/${encodeURIComponent(id)}` : '/api/categories', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+    } catch {}
+
+    const current = await this.getCategories();
+    const idx = current.findIndex(c => c.id === id);
+    let updated: CategoryItem[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = payload;
+    } else {
+      updated = [...current, payload];
+    }
+    setLocalData('noor_category_items', updated);
+
+    // Sync to ecom settings for backward compatibility
+    try {
+      const ecom = await this.getEcomSettings();
+      ecom.categoryItems = updated;
+      ecom.categories = updated.map(c => c.name);
+      await this.saveEcomSettings(ecom);
+    } catch {}
+
+    return payload;
+  },
+
+  async deleteCategory(id: string): Promise<void> {
+    try {
+      await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getCategories();
+    const updated = current.filter(c => c.id !== id && c.parentId !== id);
+    setLocalData('noor_category_items', updated);
+
+    try {
+      const ecom = await this.getEcomSettings();
+      ecom.categoryItems = updated;
+      ecom.categories = updated.map(c => c.name);
+      await this.saveEcomSettings(ecom);
+    } catch {}
+  },
+  async getAttributes(): Promise<ProductAttribute[]> {
+    try {
+      const res = await fetch('/api/attributes');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_attributes', data);
+          return data;
+        }
+      }
+    } catch {}
+
+    return getLocalData<ProductAttribute[]>('noor_attributes', [
+      { id: 'attr-1', name: 'Size', values: ['S', 'M', 'L', 'XL', 'XXL'], status: true },
+      { id: 'attr-2', name: 'Color', values: ['Red', 'Green', 'Blue', 'Black', 'White'], status: true },
+      { id: 'attr-3', name: 'Weight / Pack', values: ['250g', '500g', '1kg', '2kg', '5kg'], status: true },
+      { id: 'attr-4', name: 'Material', values: ['Cotton', 'Leather', 'Steel', 'Plastic'], status: true }
+    ]);
+  },
+
+  async saveAttribute(attr: Partial<ProductAttribute>): Promise<ProductAttribute> {
+    const isEdit = Boolean(attr.id);
+    const id = attr.id || `attr-${Date.now()}`;
+    const payload: ProductAttribute = {
+      id,
+      name: attr.name || 'New Attribute',
+      values: attr.values || [],
+      status: attr.status !== undefined ? attr.status : true,
+      updatedAt: new Date().toISOString(),
+      createdAt: attr.createdAt || new Date().toISOString()
+    };
+
+    try {
+      await fetch(isEdit ? `/api/attributes/${encodeURIComponent(id)}` : '/api/attributes', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+    } catch {}
+
+    const current = await this.getAttributes();
+    const idx = current.findIndex(a => a.id === id);
+    let updated: ProductAttribute[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = payload;
+    } else {
+      updated = [payload, ...current];
+    }
+    setLocalData('noor_attributes', updated);
+    return payload;
+  },
+
+  async deleteAttribute(id: string): Promise<void> {
+    try {
+      await fetch(`/api/attributes/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getAttributes();
+    const updated = current.filter(a => a.id !== id);
+    setLocalData('noor_attributes', updated);
+  },
+
+  async getUnits(): Promise<ProductUnit[]> {
+    try {
+      const res = await fetch('/api/units');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_units', data);
+          return data;
+        }
+      }
+    } catch {}
+
+    return getLocalData<ProductUnit[]>('noor_units', [
+      { id: 'unit-1', name: 'Piece', code: 'pc', status: true },
+      { id: 'unit-2', name: 'Kilogram', code: 'kg', status: true },
+      { id: 'unit-3', name: 'Gram', code: 'gm', status: true },
+      { id: 'unit-4', name: 'Litre', code: 'ltr', status: true },
+      { id: 'unit-5', name: 'Pack', code: 'pk', status: true },
+      { id: 'unit-6', name: 'Box', code: 'bx', status: true }
+    ]);
+  },
+
+  async saveUnit(unit: Partial<ProductUnit>): Promise<ProductUnit> {
+    const isEdit = Boolean(unit.id);
+    const id = unit.id || `unit-${Date.now()}`;
+    const payload: ProductUnit = {
+      id,
+      name: unit.name || 'Unit',
+      code: unit.code || 'pc',
+      status: unit.status !== undefined ? unit.status : true,
+      updatedAt: new Date().toISOString(),
+      createdAt: unit.createdAt || new Date().toISOString()
+    };
+
+    try {
+      await fetch(isEdit ? `/api/units/${encodeURIComponent(id)}` : '/api/units', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+    } catch {}
+
+    const current = await this.getUnits();
+    const idx = current.findIndex(u => u.id === id);
+    let updated: ProductUnit[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = payload;
+    } else {
+      updated = [payload, ...current];
+    }
+    setLocalData('noor_units', updated);
+    return payload;
+  },
+
+  async deleteUnit(id: string): Promise<void> {
+    try {
+      await fetch(`/api/units/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getUnits();
+    const updated = current.filter(u => u.id !== id);
+    setLocalData('noor_units', updated);
+  },
+  async getVendors(): Promise<Vendor[]> {
+    try {
+      const res = await fetch('/api/vendors');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_vendors', data);
+          return data;
+        }
+      }
+    } catch {}
+
+    const list = getLocalData<Vendor[]>('noor_vendors', []);
+    return list;
+  },
+
+  async saveVendor(vendor: Vendor): Promise<Vendor> {
+    const isEdit = Boolean(vendor.id);
+    const finalVendor: Vendor = {
+      ...vendor,
+      id: vendor.id || `vendor-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      slug: vendor.slug || (vendor.storeName || 'store').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      createdAt: vendor.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      if (isEdit) {
+        // Try PUT first, fallback to POST if not in DB yet
+        const res = await fetch(`/api/vendors/${encodeURIComponent(finalVendor.id)}`, {
+          method: 'PUT',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify(finalVendor)
+        });
+        if (!res.ok && res.status === 404) {
+          await fetch('/api/vendors', {
+            method: 'POST',
+            headers: getAdminAuthHeaders(),
+            body: JSON.stringify(finalVendor)
+          });
+        }
+      } else {
+        await fetch('/api/vendors', {
+          method: 'POST',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify(finalVendor)
+        });
+      }
+    } catch (e) {
+      console.warn('Network error saving vendor to server, updating locally:', e);
+    }
+
+    const current = await this.getVendors();
+    const existingIndex = current.findIndex(v => v.id === finalVendor.id);
+    let updated: Vendor[];
+    if (existingIndex >= 0) {
+      updated = [...current];
+      updated[existingIndex] = finalVendor;
+    } else {
+      updated = [finalVendor, ...current];
+    }
+    setLocalData('noor_vendors', updated);
+    window.dispatchEvent(new CustomEvent('vendors-updated', { detail: updated }));
+    return finalVendor;
+  },
+
+  async deleteVendor(id: string): Promise<void> {
+    try {
+      await fetch(`/api/vendors/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+    } catch {}
+
+    const current = await this.getVendors();
+    const updated = current.filter(v => v.id !== id);
+    setLocalData('noor_vendors', updated);
+    window.dispatchEvent(new CustomEvent('vendors-updated', { detail: updated }));
+  },
+
+  async getWithdrawals(): Promise<WithdrawalRequest[]> {
+    try {
+      const res = await fetch('/api/vendors/withdrawals');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_withdrawals', data);
+          return data;
+        }
+      }
+    } catch {}
+
+    return getLocalData<WithdrawalRequest[]>('noor_withdrawals', []);
+  },
+
+  async updateWithdrawalStatus(id: string, status: 'approved' | 'rejected' | 'pending', notes?: string): Promise<any> {
+    try {
+      const res = await fetch(`/api/vendors/withdrawals/${encodeURIComponent(id)}/status`, {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify({ status, notes })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {}
+
+    // Fallback local update
+    const current = await this.getWithdrawals();
+    const idx = current.findIndex(w => w.id === id);
+    if (idx >= 0) {
+      current[idx].status = status;
+      if (notes) current[idx].notes = notes;
+      current[idx].decidedAt = new Date().toISOString();
+      setLocalData('noor_withdrawals', [...current]);
+    }
+    return { success: true };
+  },
+
+  // ===== VAT & TAX MANAGEMENT (REAL APIS) =====
+  async getTaxes(): Promise<TaxItem[]> {
+    try {
+      const res = await fetch('/api/taxes');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_taxes', data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching taxes from server API:', e);
+    }
+    return getLocalData<TaxItem[]>('noor_taxes', []);
+  },
+
+  async addTax(tax: Omit<TaxItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<TaxItem> {
+    const res = await fetch('/api/taxes', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(tax)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const saved: TaxItem = await res.json();
+    const current = await this.getTaxes();
+    const updated = [saved, ...current.filter(t => t.id !== saved.id)];
+    setLocalData('noor_taxes', updated);
+    window.dispatchEvent(new CustomEvent('taxes-updated', { detail: updated }));
+    return saved;
+  },
+
+  async updateTax(id: string, tax: Partial<TaxItem>): Promise<TaxItem> {
+    const res = await fetch(`/api/taxes/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(tax)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const updatedItem: TaxItem = await res.json();
+    const current = await this.getTaxes();
+    const updated = current.map(t => t.id === id ? updatedItem : t);
+    setLocalData('noor_taxes', updated);
+    window.dispatchEvent(new CustomEvent('taxes-updated', { detail: updated }));
+    return updatedItem;
+  },
+
+  async deleteTax(id: string): Promise<void> {
+    const res = await fetch(`/api/taxes/${id}`, {
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const current = await this.getTaxes();
+    const updated = current.filter(t => t.id !== id);
+    setLocalData('noor_taxes', updated);
+    window.dispatchEvent(new CustomEvent('taxes-updated', { detail: updated }));
+  },
+
+  // ===== DRIVER MANAGEMENT (REAL APIS) =====
+  async getDrivers(filter?: { search?: string; status?: string }): Promise<Driver[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.search) params.append('search', filter.search);
+      if (filter?.status) params.append('status', filter.status);
+      const url = `/api/drivers${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_drivers', data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching drivers from server API:', e);
+    }
+    return getLocalData<Driver[]>('noor_drivers', []);
+  },
+
+  async getDriverById(id: string): Promise<Driver | null> {
+    try {
+      const res = await fetch(`/api/drivers/${id}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Failed fetching driver by ID:', e);
+    }
+    const current = await this.getDrivers();
+    return current.find(d => d.id === id) || null;
+  },
+
+  async addDriver(driver: Omit<Driver, 'id' | 'createdAt' | 'updatedAt'>): Promise<Driver> {
+    const res = await fetch('/api/drivers', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(driver)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const saved: Driver = await res.json();
+    const current = await this.getDrivers();
+    const updated = [saved, ...current.filter(d => d.id !== saved.id)];
+    setLocalData('noor_drivers', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('drivers-updated', { detail: updated }));
+    }
+    return saved;
+  },
+
+  async updateDriver(id: string, driver: Partial<Driver>): Promise<Driver> {
+    const res = await fetch(`/api/drivers/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(driver)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const updatedItem: Driver = await res.json();
+    const current = await this.getDrivers();
+    const updated = current.map(d => d.id === id ? updatedItem : d);
+    setLocalData('noor_drivers', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('drivers-updated', { detail: updated }));
+    }
+    return updatedItem;
+  },
+
+  async deleteDriver(id: string): Promise<void> {
+    const res = await fetch(`/api/drivers/${id}`, {
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const current = await this.getDrivers();
+    const updated = current.filter(d => d.id !== id);
+    setLocalData('noor_drivers', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('drivers-updated', { detail: updated }));
+    }
+  },
+
+  // ===== FLASH SALES MANAGEMENT (REAL APIS) =====
+  async getFlashSales(filter?: { search?: string; status?: string }): Promise<FlashSaleItem[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.search) params.append('search', filter.search);
+      if (filter?.status) params.append('status', filter.status);
+      const url = `/api/flash-sales${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_flash_sales', data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching flash sales from server API:', e);
+    }
+    return getLocalData<FlashSaleItem[]>('noor_flash_sales', []);
+  },
+
+  async getFlashSaleById(id: string): Promise<FlashSaleItem | null> {
+    try {
+      const res = await fetch(`/api/flash-sales/${id}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Failed fetching flash sale by ID:', e);
+    }
+    const current = await this.getFlashSales();
+    return current.find(f => f.id === id) || null;
+  },
+
+  async addFlashSale(item: Omit<FlashSaleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<FlashSaleItem> {
+    const res = await fetch('/api/flash-sales', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(item)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const saved: FlashSaleItem = await res.json();
+    const current = await this.getFlashSales();
+    const updated = [saved, ...current.filter(f => f.id !== saved.id)];
+    setLocalData('noor_flash_sales', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flash-sales-updated', { detail: updated }));
+    }
+    return saved;
+  },
+
+  async updateFlashSale(id: string, item: Partial<FlashSaleItem>): Promise<FlashSaleItem> {
+    const res = await fetch(`/api/flash-sales/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(item)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const updatedItem: FlashSaleItem = await res.json();
+    const current = await this.getFlashSales();
+    const updated = current.map(f => f.id === id ? updatedItem : f);
+    setLocalData('noor_flash_sales', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flash-sales-updated', { detail: updated }));
+    }
+    return updatedItem;
+  },
+
+  async deleteFlashSale(id: string): Promise<void> {
+    const res = await fetch(`/api/flash-sales/${id}`, {
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const current = await this.getFlashSales();
+    const updated = current.filter(f => f.id !== id);
+    setLocalData('noor_flash_sales', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flash-sales-updated', { detail: updated }));
+    }
+  },
+
+  // ===== SUBSCRIPTION & MEMBERSHIP PLANS (REAL APIS) =====
+  async getSubscriptionPlans(filter?: { status?: string; targetAudience?: string }): Promise<SubscriptionPlan[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.status) params.append('status', filter.status);
+      if (filter?.targetAudience) params.append('targetAudience', filter.targetAudience);
+      const url = `/api/subscriptions${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocalData('noor_subscription_plans', data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching subscription plans from server API:', e);
+    }
+    return getLocalData<SubscriptionPlan[]>('noor_subscription_plans', []);
+  },
+
+  async addSubscriptionPlan(plan: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'>): Promise<SubscriptionPlan> {
+    const res = await fetch('/api/subscriptions', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(plan)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const saved: SubscriptionPlan = await res.json();
+    const current = await this.getSubscriptionPlans();
+    const updated = [saved, ...current.filter(p => p.id !== saved.id)];
+    setLocalData('noor_subscription_plans', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('subscriptions-updated', { detail: updated }));
+    }
+    return saved;
+  },
+
+  async updateSubscriptionPlan(id: string, plan: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
+    const res = await fetch(`/api/subscriptions/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(plan)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const updatedItem: SubscriptionPlan = await res.json();
+    const current = await this.getSubscriptionPlans();
+    const updated = current.map(p => p.id === id ? updatedItem : p);
+    setLocalData('noor_subscription_plans', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('subscriptions-updated', { detail: updated }));
+    }
+    return updatedItem;
+  },
+
+  async deleteSubscriptionPlan(id: string): Promise<void> {
+    const res = await fetch(`/api/subscriptions/${id}`, {
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.details || err.message || err.error || `Server error ${res.status}`);
+    }
+
+    const current = await this.getSubscriptionPlans();
+    const updated = current.filter(p => p.id !== id);
+    setLocalData('noor_subscription_plans', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('subscriptions-updated', { detail: updated }));
+    }
   },
 
   async saveBrands(brands: Brand[]): Promise<void> {

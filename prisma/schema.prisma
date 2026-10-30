@@ -21,6 +21,8 @@ model Product {
   subCategory        String?
   brand              String?
   brandId            String?
+  vendorId           String?
+  vendorName         String?
   stock              Int?     @default(0)
   openingStock       Int?
   receivedStock      Int?
@@ -50,6 +52,13 @@ model Product {
   authorName         String?
   pdfUrl             String?
   slug               String?
+  unit               String?
+  minOrderQty        Int?     @default(1)
+  maxOrderQty        Int?
+  wholesalePrice     Float?
+  isWholesaleAvailable Boolean? @default(false)
+  isFeatured         Boolean? @default(false)
+  selectedAttributes String?  // JSON string
 }
 
 model Order {
@@ -94,6 +103,10 @@ model Setting {
 model Category {
   id            String   @id @default(cuid())
   name          String
+  slug          String?
+  parentId      String?  // ID of parent category, null for root category
+  description   String?
+  isActive      Boolean? @default(true)
   order         Int?     @default(0)
   image         String?
   icon          String?
@@ -126,8 +139,11 @@ model Customer {
   name           String
   phone          String   @unique
   email          String?
+  image          String?
   address        String?
   district       String?
+  customerType   String?  @default("regular") // regular, wholesaler
+  notes          String?
   registeredAt   DateTime @default(now())
   totalOrders    Int?     @default(0)
   totalSpent     Float?   @default(0)
@@ -147,7 +163,13 @@ model Coupon {
   minimumSpent    Float?
   usageLimit      Int?
   usageCount      Int      @default(0)
+  startDate       String?
+  startTime       String?
+  expiredDate     String?
+  expiredTime     String?
   endDate         DateTime?
+  limitPerUser    Int?     @default(1)
+  shopId          String?
   type            String   @default("fixed") // 'fixed' | 'percentage'
   status          String   @default("Active") // 'Active' | 'Inactive'
   visibility      String   @default("Public") // 'Public' | 'Private'
@@ -178,6 +200,8 @@ model Brand {
   logo        String?
   description String?
   website     String?
+  isActive    Boolean? @default(true)
+  sortOrder   Int?     @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -235,4 +259,146 @@ model LandingPage {
   luckyDrawRules     String?  // JSON string array
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model Tax {
+  id         String   @id @default(cuid())
+  name       String
+  percentage Float
+  status     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Driver {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String?
+  phone          String   @unique
+  email          String?
+  profilePhoto   String?
+  gender         String?  @default("Male")
+  dateOfBirth    String?
+  drivingLicense String?
+  vehicleType    String?
+  password       String?
+  status         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Supplier {
+  id                   String   @id @default(cuid())
+  name                 String
+  phone                String   @unique
+  email                String?
+  profilePhoto         String?
+  address              String?
+  purchasesCount       Int?     @default(0)
+  totalPurchasedAmount Float?   @default(0)
+  balance              Float?   @default(0)
+  status               Boolean  @default(true)
+  companyName          String?
+  suppliedProducts     String?
+  notes                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model FlashSale {
+  id              String   @id @default(cuid())
+  name            String
+  minimumDiscount Float
+  startDate       String
+  startTime       String
+  endDate         String
+  endTime         String
+  description     String
+  thumbnail       String?
+  status          Boolean  @default(true)
+  productIds      String?  // JSON string array of product IDs
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SubscriptionPlan {
+  id              String   @id @default(cuid())
+  name            String
+  shortDescription String?
+  description     String?
+  price           Float
+  durationDays    Int
+  sellLimit       Int?
+  isPopular       Boolean  @default(false)
+  status          Boolean  @default(true)
+  targetAudience  String?  @default("vendor") // 'vendor' | 'customer'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Vendor {
+  id              String   @id @default(cuid())
+  storeName       String
+  slug            String   @unique
+  firstName       String?
+  lastName        String?
+  ownerName       String
+  email           String   @unique
+  phone           String
+  gender          String?  @default("Male")
+  password        String?
+  logo            String?
+  banner          String?
+  ownerPhoto      String?
+  description     String?
+  address         String?
+  district        String?
+  commissionRate  Float?   @default(8.0)
+  deliveryCharge  Float?   @default(40.0)
+  orderPrefix     String?  @default("RC")
+  productsCount   Int?     @default(0)
+  ordersCount     Int?     @default(0)
+  totalSales      Float?   @default(0.0)
+  walletBalance   Float?   @default(0.0)
+  totalWithdrawn  Float?   @default(0.0)
+  rating          Float?   @default(0.0)
+  isOpen          Boolean? @default(true)
+  status          String?  @default("active")
+  payoutMethod    String?
+  payoutAccount   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Attribute {
+  id        String   @id @default(cuid())
+  name      String
+  values    String?  // JSON string array of values
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WithdrawalRequest {
+  id            String    @id @default(cuid())
+  vendorId      String
+  amount        Float
+  method        String?
+  accountNumber String?
+  contactNumber String?
+  status        String?   @default("pending") // 'pending' | 'approved' | 'rejected'
+  notes         String?
+  requestedAt   DateTime  @default(now())
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

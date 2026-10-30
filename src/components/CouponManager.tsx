@@ -1,573 +1,732 @@
 import React, { useState, useEffect } from 'react';
-import { Coupon } from '../types';
+import { Coupon, ActiveTab } from '../types';
 import { dbService } from '../lib/dbService';
-import { CircularProgress } from './LoadingSkeleton';
-import { Search, Plus, Edit2, Trash2, X, Check, Tag, Filter, ShieldCheck } from 'lucide-react';
+import { 
+  Tag, Plus, Search, Eye, Edit3, Trash2, Calendar, Clock, 
+  ArrowLeft, Check, X, Building, Percent, DollarSign, Store
+} from 'lucide-react';
+import { FeedbackDialog } from './ui/FeedbackDialog';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 
-export default function CouponManager() {
+interface CouponManagerProps {
+  initialView?: 'list' | 'create';
+  onNavigateTab?: (tab: ActiveTab) => void;
+}
+
+export default function CouponManager({ initialView = 'list', onNavigateTab }: CouponManagerProps) {
+  const [viewMode, setViewMode] = useState<'list' | 'create'>(initialView);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [primaryColor, setPrimaryColor] = useState('#0f766e');
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterTab, setFilterTab] = useState<'All' | 'Active' | 'Inactive' | 'Public' | 'Private'>('All');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Edit/Create drawer state
-  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [deleteTargetCouponId, setDeleteTargetCouponId] = useState<string | null>(null);
+  // Selected for Details / Deletion
+  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Coupon | null>(null);
 
-  // Form states
-  const [formTitle, setFormTitle] = useState('');
-  const [formCode, setFormCode] = useState('');
-  const [formDiscount, setFormDiscount] = useState<number>(0);
-  const [formMaxDiscount, setFormMaxDiscount] = useState<number>(0);
-  const [formMinSpent, setFormMinSpent] = useState<number>(0);
-  const [formUsageLimit, setFormUsageLimit] = useState<number>(0);
-  const [formEndDate, setFormEndDate] = useState('');
-  const [formType, setFormType] = useState<'fixed' | 'percentage'>('fixed');
-  const [formIsActive, setFormIsActive] = useState(true);
-  const [formIsPublic, setFormIsPublic] = useState(false);
-  const [formOncePerCustomer, setFormOncePerCustomer] = useState(false);
-  const [formDescription, setFormDescription] = useState('');
+  // Form Fields (Exact match to Screenshot 2: Add New Promo Code)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [shopId, setShopId] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [discountType, setDiscountType] = useState<'Amount' | 'Percentage'>('Amount');
+  const [discount, setDiscount] = useState<number | ''>('');
+  const [minimumOrderAmount, setMinimumOrderAmount] = useState<number | ''>('');
+  const [limitForSingleUser, setLimitForSingleUser] = useState<number | ''>('');
+  const [maximumDiscountAmount, setMaximumDiscountAmount] = useState<number | ''>('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [expiredDate, setExpiredDate] = useState('');
+  const [expiredTime, setExpiredTime] = useState('');
+  const [couponStatus, setCouponStatus] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
+  // Global Feedback
+  const [feedback, setFeedback] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
 
   useEffect(() => {
-    loadCoupons();
-  }, []);
+    setViewMode(initialView);
+  }, [initialView]);
 
   const loadCoupons = async () => {
     setLoading(true);
     try {
-      const list = await dbService.getCoupons();
-      setCoupons(list);
-      const settings = await dbService.getEcomSettings();
-      if (settings && settings.primaryColor) {
-        setPrimaryColor(settings.primaryColor);
-      }
-    } catch (e) {
-      console.error('Error loading coupons:', e);
+      const data = await dbService.getCoupons();
+      setCoupons(data);
+    } catch (err) {
+      console.error('Failed loading coupons:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadCoupons();
+    const handleSync = () => loadCoupons();
+    window.addEventListener('ecom-coupons-updated', handleSync);
+    return () => window.removeEventListener('ecom-coupons-updated', handleSync);
+  }, []);
+
+  const resetForm = () => {
+    setShopId('');
+    setCouponCode('');
+    setDiscountType('Amount');
+    setDiscount('');
+    setMinimumOrderAmount('');
+    setLimitForSingleUser('');
+    setMaximumDiscountAmount('');
+    setStartDate('');
+    setStartTime('');
+    setExpiredDate('');
+    setExpiredTime('');
+    setCouponStatus(true);
+    setIsEditing(false);
+    setEditingId(null);
+  };
+
   const handleOpenCreate = () => {
-    setEditingCoupon(null);
-    setIsCreating(true);
-    setFormTitle('');
-    setFormCode('');
-    setFormDiscount(0);
-    setFormMaxDiscount(0);
-    setFormMinSpent(0);
-    setFormUsageLimit(100);
-    setFormEndDate('');
-    setFormType('fixed');
-    setFormIsActive(true);
-    setFormIsPublic(false);
-    setFormOncePerCustomer(false);
-    setFormDescription('');
+    resetForm();
+    setViewMode('create');
   };
 
-  const handleOpenEdit = (coupon: Coupon) => {
-    setIsCreating(false);
-    setEditingCoupon(coupon);
-    setFormTitle(coupon.title || '');
-    setFormCode(coupon.code || '');
-    setFormDiscount(coupon.discount || 0);
-    setFormMaxDiscount(coupon.maxDiscount || 0);
-    setFormMinSpent(coupon.minimumSpent || 0);
-    setFormUsageLimit(coupon.usageLimit || 0);
-    setFormEndDate(coupon.endDate || '');
-    setFormType(coupon.type || 'fixed');
-    setFormIsActive(coupon.status === 'Active');
-    setFormIsPublic(coupon.visibility === 'Public');
-    setFormOncePerCustomer(coupon.oncePerCustomer || false);
-    setFormDescription(coupon.description || '');
+  const handleOpenEdit = (c: Coupon) => {
+    setShopId(c.shopId || '');
+    setCouponCode(c.code);
+    setDiscountType(c.type === 'percentage' ? 'Percentage' : 'Amount');
+    setDiscount(c.discount);
+    setMinimumOrderAmount(c.minimumSpent ?? c.minSpent ?? '');
+    setLimitForSingleUser(c.limitPerUser ?? c.usageLimit ?? '');
+    setMaximumDiscountAmount(c.maxDiscount ?? '');
+    setStartDate(c.startDate || '');
+    setStartTime(c.startTime || '');
+    setExpiredDate(c.expiredDate || (c.endDate ? c.endDate.split('T')[0] : ''));
+    setExpiredTime(c.expiredTime || '');
+    setCouponStatus(c.status === 'Active');
+    setIsEditing(true);
+    setEditingId(c.id);
+    setViewMode('create');
   };
 
-  const handleCloseForm = () => {
-    setEditingCoupon(null);
-    setIsCreating(false);
+  // Toggle Coupon Active / Inactive Status
+  const handleToggleStatus = async (coupon: Coupon) => {
+    const isCurrentlyActive = coupon.status === 'Active';
+    const newStatus = isCurrentlyActive ? 'Inactive' : 'Active';
+    try {
+      setCoupons(prev => prev.map(c => c.id === coupon.id ? { ...c, status: newStatus } : c));
+      await dbService.updateCoupon({
+        ...coupon,
+        status: newStatus
+      });
+    } catch (err: any) {
+      setCoupons(prev => prev.map(c => c.id === coupon.id ? { ...c, status: coupon.status } : c));
+      setFeedback({
+        isOpen: true,
+        type: 'error',
+        title: 'Status Update Failed',
+        message: err.message || 'Could not update promo code status.'
+      });
+    }
   };
 
-  const handleSaveCoupon = async (e: React.FormEvent) => {
+  // Submit Create / Edit Form
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formCode.trim()) {
-      alert('Must give coupon code!');
+
+    const cleanCode = couponCode.trim().toUpperCase();
+    if (!cleanCode) {
+      setFeedback({ isOpen: true, type: 'error', title: 'Missing Field', message: 'Coupon Code is required.' });
       return;
     }
 
-    setSaving(true);
+    if (discount === '' || Number(discount) <= 0) {
+      setFeedback({ isOpen: true, type: 'error', title: 'Invalid Discount', message: 'Please specify a valid discount.' });
+      return;
+    }
+
+    if (minimumOrderAmount === '' || Number(minimumOrderAmount) < 0) {
+      setFeedback({ isOpen: true, type: 'error', title: 'Missing Field', message: 'Minimum Order Amount is required.' });
+      return;
+    }
+
+    if (!startDate || !startTime || !expiredDate || !expiredTime) {
+      setFeedback({ isOpen: true, type: 'error', title: 'Missing Dates', message: 'Start & Expired dates and times are required.' });
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const couponPayload = {
-        code: formCode.trim().toUpperCase(),
-        title: formTitle.trim() || formCode.trim(),
-        discount: Number(formDiscount) || 0,
-        maxDiscount: Number(formMaxDiscount) || 0,
-        minimumSpent: Number(formMinSpent) || 0,
-        usageLimit: Number(formUsageLimit) || 0,
-        usageCount: editingCoupon ? editingCoupon.usageCount : 0,
-        endDate: formEndDate,
-        type: formType,
-        status: (formIsActive ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
-        visibility: (formIsPublic ? 'Public' : 'Private') as 'Public' | 'Private',
-        oncePerCustomer: formOncePerCustomer,
-        description: formDescription,
-        updatedAt: 'Just now'
+      const payload: any = {
+        code: cleanCode,
+        title: cleanCode,
+        discount: Number(discount),
+        discountType: discountType.toLowerCase(),
+        type: discountType === 'Percentage' ? 'percentage' : 'fixed',
+        minimumOrderAmount: Number(minimumOrderAmount),
+        minimumSpent: Number(minimumOrderAmount),
+        maximumDiscountAmount: maximumDiscountAmount !== '' ? Number(maximumDiscountAmount) : undefined,
+        maxDiscount: maximumDiscountAmount !== '' ? Number(maximumDiscountAmount) : undefined,
+        limitForSingleUser: limitForSingleUser !== '' ? Number(limitForSingleUser) : 1,
+        limitPerUser: limitForSingleUser !== '' ? Number(limitForSingleUser) : 1,
+        startDate,
+        startTime,
+        expiredDate,
+        expiredTime,
+        endDate: expiredDate,
+        shopId: shopId.trim() || undefined,
+        status: couponStatus ? 'Active' : 'Inactive'
       };
 
-      if (isCreating) {
-        await dbService.addCoupon(couponPayload);
-        setMsg('The new coupon has been created successfully!');
-      } else if (editingCoupon) {
+      if (isEditing && editingId) {
         await dbService.updateCoupon({
-          ...couponPayload,
-          id: editingCoupon.id
+          ...payload,
+          id: editingId,
+          usageCount: coupons.find(c => c.id === editingId)?.usageCount || 0,
+          updatedAt: new Date().toISOString()
         });
-        setMsg('Coupon update was successful!');
+        setFeedback({
+          isOpen: true,
+          type: 'success',
+          title: 'Promo Code Updated',
+          message: `Promo code "${cleanCode}" has been updated.`
+        });
+      } else {
+        await dbService.addCoupon({
+          ...payload,
+          id: `cpn-${Date.now()}`,
+          usageCount: 0,
+          visibility: 'Public',
+          updatedAt: new Date().toISOString()
+        });
+        setFeedback({
+          isOpen: true,
+          type: 'success',
+          title: 'Promo Code Created',
+          message: `Promo code "${cleanCode}" created successfully.`
+        });
       }
 
-      await loadCoupons();
-      handleCloseForm();
-      setTimeout(() => setMsg(''), 3000);
+      resetForm();
+      setViewMode('list');
+      loadCoupons();
     } catch (err: any) {
-      console.error('Error saving coupon:', err);
-      alert('There was a problem saving the coupon: ' + (err.message || ''));
+      setFeedback({
+        isOpen: true,
+        type: 'error',
+        title: 'Save Failed',
+        message: err.message || 'Failed to save promo code. Please verify code uniqueness.'
+      });
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteCoupon = (id: string) => {
-    setDeleteTargetCouponId(id);
-  };
-
-  const handleConfirmDeleteCoupon = async () => {
-    if (!deleteTargetCouponId) return;
-    const targetId = deleteTargetCouponId;
-    setDeleteTargetCouponId(null);
+  const handleExecuteDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await dbService.deleteCoupon(targetId);
-      await loadCoupons();
-      if (editingCoupon?.id === targetId) {
-        handleCloseForm();
-      }
-      setMsg('Coupon has been successfully deleted!');
-      setTimeout(() => setMsg(''), 3000);
-    } catch (e) {
-      console.error('Delete coupon failed:', e);
-      alert('Failed to delete coupon. Try again.');
+      await dbService.deleteCoupon(deleteTarget.id);
+      setFeedback({
+        isOpen: true,
+        type: 'success',
+        title: 'Promo Code Deleted',
+        message: `Promo code "${deleteTarget.code}" has been removed.`
+      });
+      loadCoupons();
+    } catch (err: any) {
+      setFeedback({
+        isOpen: true,
+        type: 'error',
+        title: 'Delete Failed',
+        message: err.message || 'Could not delete promo code.'
+      });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
-  // Filtered coupons
-  const filteredCoupons = coupons.filter(coupon => {
-    // Search query
-    const matchesSearch = 
-      coupon.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      coupon.title.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (filterTab === 'Active') return coupon.status === 'Active';
-    if (filterTab === 'Inactive') return coupon.status === 'Inactive';
-    if (filterTab === 'Public') return coupon.visibility === 'Public';
-    if (filterTab === 'Private') return coupon.visibility === 'Private';
-
-    return true;
+  const filteredCoupons = coupons.filter(c => {
+    const q = searchTerm.toLowerCase();
+    return c.code.toLowerCase().includes(q) || (c.title || '').toLowerCase().includes(q);
   });
 
   return (
     <div className="space-y-6 font-sans">
-      {/* Top Header matching Screenshot 1 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Coupon management</h2>
-          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Create and manage coupon codes and discount offers for customers.</p>
-        </div>
-        <div>
-          <button
-            onClick={handleOpenCreate}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span>new coupon</span>
-          </button>
-        </div>
-      </div>
-
-      {msg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{msg}</span>
-        </div>
-      )}
-
-      {/* Filter and Search Bar matching Screenshot 1 */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {(['All', 'Active', 'Inactive', 'Public', 'Private'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setFilterTab(tab)}
-              style={filterTab === tab ? { backgroundColor: primaryColor } : undefined}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === tab
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/60'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Input */}
-        <div className="relative min-w-[260px] md:w-80">
-          <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by code or title"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-blue-500 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Inline Form Modal Drawer for Editing/Creating Coupon (Matching Screenshot 2) */}
-      {(isCreating || editingCoupon) && (
-        <div className="bg-white rounded-2xl border-2 border-blue-200 p-6 sm:p-7 shadow-lg space-y-6 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      {viewMode === 'list' ? (
+        /* List View (Exact Match to Screenshot 1: Promo Codes) */
+        <div className="space-y-6">
+          {/* Header Title & Create Button */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">
-                {isCreating ? 'Create new coupons' : `Edit coupons: ${editingCoupon?.code}`}
-              </h3>
-              <p className="text-slate-500 text-xs mt-0.5">
-                Here are all the couponsTNs Update And save can do।
+              <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                <Tag className="h-5 w-5 text-teal-600" />
+                Promo Codes
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage checkout discount codes, fixed allowances, and percentages.
               </p>
             </div>
-            <button
-              onClick={handleCloseForm}
-              className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors cursor-pointer"
-            >
-              Close
-            </button>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search promo codes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none shadow-2xs"
+                />
+              </div>
+
+              {/* Green Create New Button (Matches Screenshot 1) */}
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                Create New
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSaveCoupon} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Title */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="e.g. 2000"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl"
-                />
-              </div>
+          {/* Table Container (Matches Screenshot 1 Columns: Code, Discount, Min Amount, Started At, Expired At, Status, Action) */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-5">Code</th>
+                    <th className="py-3 px-5">Discount</th>
+                    <th className="py-3 px-5">Min Amount</th>
+                    <th className="py-3 px-5">Started At</th>
+                    <th className="py-3 px-5">Expired At</th>
+                    <th className="py-3 px-5 text-center w-28">Status</th>
+                    <th className="py-3 px-5 text-center w-28">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filteredCoupons.map((c) => {
+                    const isActive = c.status === 'Active';
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                        {/* Code */}
+                        <td className="py-4 px-5 font-mono font-bold text-slate-900 text-sm">
+                          <span className="px-2.5 py-1 bg-teal-50 text-teal-800 rounded-lg border border-teal-200">
+                            {c.code}
+                          </span>
+                        </td>
 
-              {/* Code */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Code
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formCode}
-                  onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. DIS2000"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl font-mono uppercase font-bold"
-                />
-              </div>
+                        {/* Discount */}
+                        <td className="py-4 px-5 font-bold text-emerald-700">
+                          {c.type === 'percentage' ? `${c.discount}%` : `৳${c.discount.toLocaleString()}`}
+                          {c.maxDiscount ? (
+                            <span className="text-[11px] text-slate-400 font-normal block">
+                              Max: ৳{c.maxDiscount}
+                            </span>
+                          ) : null}
+                        </td>
 
-              {/* Discount */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Discount Amount / %
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={formDiscount}
-                  onChange={(e) => setFormDiscount(Number(e.target.value))}
-                  placeholder="2500"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl font-semibold"
-                />
-              </div>
+                        {/* Min Amount */}
+                        <td className="py-4 px-5 text-slate-800 font-semibold">
+                          ৳{(c.minimumSpent ?? c.minSpent ?? 0).toLocaleString()}
+                        </td>
 
-              {/* Max discount */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Max discount (0 for unlimited)
-                </label>
-                <input
-                  type="number"
-                  value={formMaxDiscount}
-                  onChange={(e) => setFormMaxDiscount(Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl"
-                />
-              </div>
+                        {/* Started At */}
+                        <td className="py-4 px-5 text-slate-600">
+                          {c.startDate ? (
+                            <>
+                              <div>{c.startDate}</div>
+                              {c.startTime && <div className="text-[11px] text-slate-400">{c.startTime}</div>}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">Immediate</span>
+                          )}
+                        </td>
 
-              {/* Minimum spent */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Minimum spent
-                </label>
-                <input
-                  type="number"
-                  value={formMinSpent}
-                  onChange={(e) => setFormMinSpent(Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl"
-                />
-              </div>
+                        {/* Expired At */}
+                        <td className="py-4 px-5 text-slate-600">
+                          {c.expiredDate ? (
+                            <>
+                              <div>{c.expiredDate}</div>
+                              {c.expiredTime && <div className="text-[11px] text-slate-400">{c.expiredTime}</div>}
+                            </>
+                          ) : c.endDate ? (
+                            new Date(c.endDate).toLocaleDateString()
+                          ) : (
+                            <span className="text-slate-400">Never</span>
+                          )}
+                        </td>
 
-              {/* Usage limit */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Usage limit
-                </label>
-                <input
-                  type="number"
-                  value={formUsageLimit}
-                  onChange={(e) => setFormUsageLimit(Number(e.target.value))}
-                  placeholder="10000"
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl"
-                />
-              </div>
+                        {/* Status (Green Toggle Switch matching reference) */}
+                        <td className="py-4 px-5 text-center">
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isActive}
+                              onChange={() => handleToggleStatus(c)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#22c55e]"></div>
+                          </label>
+                        </td>
 
-              {/* End date */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  End date
-                </label>
-                <input
-                  type="date"
-                  value={formEndDate}
-                  onChange={(e) => setFormEndDate(e.target.value)}
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl"
-                />
-              </div>
+                        {/* Action */}
+                        <td className="py-4 px-5 text-center">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCoupon(c)}
+                              className="p-1.5 text-slate-500 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                              title="Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(c)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(c)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
-              {/* Type */}
-              <div className="relative rounded-xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 bg-white">
-                <label className="absolute -top-2.5 left-3 px-1.5 bg-white text-xs font-medium text-slate-600 z-10">
-                  Type
-                </label>
-                <select
-                  value={formType}
-                  onChange={(e) => setFormType(e.target.value as 'fixed' | 'percentage')}
-                  className="w-full px-4 py-3 text-sm text-slate-900 bg-transparent outline-none rounded-xl cursor-pointer"
-                >
-                  <option value="fixed">Tk.</option>
-                  <option value="percentage">%</option>
-                </select>
-              </div>
+                  {filteredCoupons.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-16 text-slate-500 font-bold text-sm">
+                        No Promo Codes Found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
+          </div>
+        </div>
+      ) : (
+        /* Create / Edit Form (Exact Match to Screenshot 2: Add New Promo Code) */
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => { resetForm(); setViewMode('list'); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Promo Codes
+            </button>
+            <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <Tag className="h-5 w-5 text-teal-600" />
+              {isEditing ? 'Edit Promo Code' : 'Add New Promo Code'}
+            </h2>
+          </div>
 
-            {/* Checkboxes matching Screenshot 2 */}
-            <div className="flex flex-wrap items-center gap-6 pt-2">
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formIsActive}
-                  onChange={(e) => setFormIsActive(e.target.checked)}
-                  className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>active</span>
-              </label>
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 max-w-4xl mx-auto">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Select shops */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Select shops
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select shops (Leave blank for all shops / global)"
+                    value={shopId}
+                    onChange={(e) => setShopId(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+              </div>
 
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formIsPublic}
-                  onChange={(e) => setFormIsPublic(e.target.checked)}
-                  className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>public</span>
-              </label>
+              {/* Coupon Code * & Discount Type * */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Coupon Code <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Coupon code (e.g. SAVE20)"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-teal-500 focus:outline-none uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Discount Type <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={discountType}
+                    onChange={(e: any) => setDiscountType(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Amount">Amount (Fixed ৳)</option>
+                    <option value="Percentage">Percentage (%)</option>
+                  </select>
+                </div>
+              </div>
 
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formOncePerCustomer}
-                  onChange={(e) => setFormOncePerCustomer(e.target.checked)}
-                  className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Usable 1 time per customer</span>
-              </label>
-            </div>
+              {/* Discount * & Minimum Order Amount * */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Discount <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    placeholder="Discount"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Minimum Order Amount <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    placeholder="Minimum Order Amount"
+                    value={minimumOrderAmount}
+                    onChange={(e) => setMinimumOrderAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+              </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-              <textarea
-                rows={2}
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Optional details or coupon terms"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600"
-              />
-            </div>
+              {/* Limit For Single User & Maximum Discount Amount */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Limit For Single User
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="exm: 5"
+                    value={limitForSingleUser}
+                    onChange={(e) => setLimitForSingleUser(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Maximum Discount Amount
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="exm: ৳300"
+                    value={maximumDiscountAmount}
+                    onChange={(e) => setMaximumDiscountAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+              </div>
 
-            {/* Save / Delete actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              {editingCoupon ? (
+              {/* Start Date * & Start Time * */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Start Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Start Time <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Expired Date * & Expired Time * */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Expired Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={expiredDate}
+                    onChange={(e) => setExpiredDate(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Expired Time <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={expiredTime}
+                    onChange={(e) => setExpiredTime(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons (Cancel & Green Submit Button matching Screenshot 2) */}
+              <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => handleDeleteCoupon(editingCoupon.id)}
-                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl border border-red-200 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Delete the coupon</span>
-                </button>
-              ) : <div />}
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleCloseForm}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  onClick={() => { resetForm(); setViewMode('list'); }}
+                  className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="px-6 py-2.5 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50" style={{ backgroundColor: primaryColor }}
+                  disabled={submitting}
+                  className="px-8 py-2.5 bg-[#22c55e] hover:bg-[#16a34a] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  {saving ? 'Saving...' : 'Save changes'}
+                  {submitting ? 'Saving...' : 'Submit'}
                 </button>
               </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* Coupons Table matching Screenshot 1 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-4 w-12">sequential</th>
-                <th className="py-3.5 px-4">Coupon code</th>
-                <th className="py-3.5 px-4">Discount amount</th>
-                <th className="py-3.5 px-4">number of uses</th>
-                <th className="py-3.5 px-4">condition</th>
-                <th className="py-3.5 px-4">has been updated</th>
-                <th className="py-3.5 px-4 text-right">action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-8">
-                    <CircularProgress label="Loading coupon list..." size="md" />
-                  </td>
-                </tr>
-              ) : filteredCoupons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
-                    No data setup now
-                  </td>
-                </tr>
-              ) : (
-                filteredCoupons.map((coupon, idx) => (
-                  <tr key={coupon.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-4 px-4 font-semibold text-slate-500">{idx + 1}</td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-slate-900 tracking-tight">{coupon.code}</div>
-                      <div className="text-[11px] text-slate-400 font-normal">{coupon.title || coupon.code}</div>
-                    </td>
-                    <td className="py-4 px-4 font-semibold text-slate-800">
-                      {coupon.type === 'fixed'? `Tk. ${coupon.discount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `${coupon.discount}%`}
-                    </td>
-                    <td className="py-4 px-4 font-medium text-slate-700">
-                      {coupon.usageCount} / {coupon.usageLimit || '∞'}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          coupon.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {coupon.status}
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                          coupon.visibility === 'Public'
-                            ? 'border-blue-300 bg-blue-50 text-blue-700'
-                            : 'border-slate-300 bg-white text-slate-700'
-                        }`}>
-                          {coupon.visibility}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-xs text-slate-500">{coupon.updatedAt || 'Recently'}</td>
-                    <td className="py-4 px-4 text-right">
-                      <button
-                        onClick={() => handleOpenEdit(coupon)}
-                        className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Details Modal */}
+      {selectedCoupon && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base">Promo Code Details</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedCoupon(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-        {/* Footer Pagination Bar matching Screenshot 1 */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span>Ro</span>
-            <select className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold">
-              <option value="15">15</option>
-              <option value="30">30</option>
-              <option value="50">50</option>
-            </select>
-            <span>1-{filteredCoupons.length} of {filteredCoupons.length}</span>
-          </div>
+            <div className="p-4 bg-teal-50/70 border border-teal-200 rounded-2xl flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-teal-600 uppercase tracking-wider block">Coupon Code</span>
+                <span className="text-xl font-mono font-extrabold text-teal-950">{selectedCoupon.code}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-bold text-teal-600 uppercase tracking-wider block">Discount</span>
+                <span className="text-xl font-extrabold text-teal-950">
+                  {selectedCoupon.type === 'percentage' ? `${selectedCoupon.discount}%` : `৳${selectedCoupon.discount}`}
+                </span>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-1">
-            <button disabled className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-medium cursor-not-allowed">
-              Prev
-            </button>
-            <button className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded-lg text-xs">
-              1
-            </button>
-            <button disabled className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-medium cursor-not-allowed">
-              Next
-            </button>
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div>
+                <span className="text-slate-400 block">Min. Order Amount:</span>
+                <span className="font-bold text-slate-800">৳{(selectedCoupon.minimumSpent ?? selectedCoupon.minSpent ?? 0).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Max. Discount:</span>
+                <span className="font-bold text-slate-800">
+                  {selectedCoupon.maxDiscount ? `৳${selectedCoupon.maxDiscount.toLocaleString()}` : 'No cap'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Per User Limit:</span>
+                <span className="font-bold text-slate-800">{selectedCoupon.limitPerUser ?? selectedCoupon.usageLimit ?? 1} time(s)</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Total Used:</span>
+                <span className="font-bold text-emerald-700">{selectedCoupon.usageCount ?? 0} time(s)</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-slate-400 block">Validity Period:</span>
+                <span className="font-medium text-slate-700">
+                  {selectedCoupon.startDate || 'Immediate'} → {selectedCoupon.expiredDate || (selectedCoupon.endDate ? selectedCoupon.endDate.split('T')[0] : 'Never')}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const c = selectedCoupon;
+                  setSelectedCoupon(null);
+                  handleOpenEdit(c);
+                }}
+                className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Edit Code
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCoupon(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Confirm Delete Dialog */}
+      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={!!deleteTargetCouponId}
-        type="danger"
-        title="Delete the coupon?"
-        message="Are you sure you want to permanently delete this coupon from the database?"
-        confirmText="Yes, delete it"
-        cancelText="canceled"
-        onConfirm={handleConfirmDeleteCoupon}
-        onClose={() => setDeleteTargetCouponId(null)}
+        isOpen={!!deleteTarget}
+        title="Delete Promo Code?"
+        message={`Are you sure you want to delete promo code "${deleteTarget?.code}"?`}
+        confirmText="Yes, Delete Code"
+        confirmVariant="danger"
+        onConfirm={handleExecuteDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Global Feedback Dialog */}
+      <FeedbackDialog
+        isOpen={feedback.isOpen}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

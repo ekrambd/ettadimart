@@ -28,40 +28,29 @@ export async function checkAdminAuthorization(authorization: string): Promise<Ad
     return { ok: false, status: 401, message: 'Admin authentication is required' };
   }
 
-  // Handle development/admin bypass token
-  if (token.startsWith('BypassAdmin:') || token === adminEmail || token === adminPhone || token === '01726275850' || token === 'admin') {
-    const passedIdentity = token.replace('BypassAdmin:', '').trim();
-    return {
-      ok: true,
-      decoded: {
-        uid: 'hardcoded-admin',
-        email: passedIdentity || adminEmail,
-        phone: adminPhone,
-        admin: true,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 86400
-      }
-    };
-  }
-
-  // Verify native HMAC-SHA256 JWT
+  // In production, strictly require cryptographically verified HMAC-SHA256 JWT
   const verified = verifyAdminToken(token);
   if (verified.valid && verified.payload) {
     return { ok: true, decoded: verified.payload };
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    return {
-      ok: true,
-      decoded: {
-        uid: 'dev-admin',
-        email: adminEmail,
-        phone: adminPhone,
-        admin: true,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 86400
-      }
-    };
+  // Allow bypass ONLY in explicit non-production local development mode
+  const isDev = process.env.NODE_ENV !== 'production';
+  if (isDev) {
+    if (token.startsWith('BypassAdmin:') || token === adminEmail || token === adminPhone || token === '01726275850' || token === 'admin') {
+      const passedIdentity = token.replace('BypassAdmin:', '').trim();
+      return {
+        ok: true,
+        decoded: {
+          uid: 'dev-admin',
+          email: passedIdentity || adminEmail,
+          phone: adminPhone,
+          admin: true,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 86400
+        }
+      };
+    }
   }
 
   return { ok: false, status: 401, message: 'Admin session is invalid or expired. Please sign in again.' };

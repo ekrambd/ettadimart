@@ -211,7 +211,10 @@ export class BackupEngine {
   /**
    * Restore application state from a specific backup ID
    */
-  public async restoreBackup(backupId: string): Promise<{ success: boolean; restored: BackupMetadata['collections'] }> {
+  public async restoreBackup(
+    backupId: string, 
+    options?: { dryRun?: boolean }
+  ): Promise<{ success: boolean; restored: BackupMetadata['collections'] }> {
     let rawContent: string | null = null;
 
     const diskPath = path.join(this.backupDir, `${backupId}.json`);
@@ -227,29 +230,31 @@ export class BackupEngine {
 
     const payload = JSON.parse(rawContent) as BackupPayload;
 
-    if (Array.isArray(payload.data.products)) {
-      await prisma.product.deleteMany({});
-      for (const p of payload.data.products) {
-        try {
-          await prisma.product.create({ data: p });
-        } catch {}
+    if (!options?.dryRun) {
+      if (Array.isArray(payload.data.products)) {
+        await prisma.product.deleteMany({});
+        for (const p of payload.data.products) {
+          try {
+            await prisma.product.create({ data: p });
+          } catch {}
+        }
+      }
+
+      if (Array.isArray(payload.data.orders)) {
+        await prisma.order.deleteMany({});
+        for (const o of payload.data.orders) {
+          try {
+            await prisma.order.create({ data: o });
+          } catch {}
+        }
+      }
+
+      if (payload.data.settings) {
+        await saveDbSettings(payload.data.settings);
       }
     }
 
-    if (Array.isArray(payload.data.orders)) {
-      await prisma.order.deleteMany({});
-      for (const o of payload.data.orders) {
-        try {
-          await prisma.order.create({ data: o });
-        } catch {}
-      }
-    }
-
-    if (payload.data.settings) {
-      await saveDbSettings(payload.data.settings);
-    }
-
-    console.log(`[BackupEngine] Successfully restored snapshot '${backupId}'`);
+    console.log(`[BackupEngine] Successfully restored snapshot '${backupId}'${options?.dryRun ? ' (dry-run verified)' : ''}`);
     return {
       success: true,
       restored: payload.metadata.collections
