@@ -5,10 +5,21 @@ import { requireAdmin } from '../middleware/adminAuth';
 
 export const reviewRouter = Router();
 
-// GET all reviews
+// GET all reviews with optional productId filter
 reviewRouter.get('/', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
-    const items = await prisma.review.findMany();
+    const { productId } = req.query;
+    const where: any = {};
+    if (productId && typeof productId === 'string') {
+      where.productId = productId;
+    }
+    const items = await prisma.review.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
     res.json(items);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch reviews' });

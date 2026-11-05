@@ -84,6 +84,19 @@ export const publicStoreService = {
     return [];
   },
 
+  async getCategories(): Promise<any[]> {
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  },
+
   async getLandingPageBySlug(slug: string): Promise<LandingPageData | null> {
     const targetSlug = slug.trim().toLowerCase();
     if (!targetSlug) return null;

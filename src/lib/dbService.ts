@@ -1400,6 +1400,40 @@ export const dbService = {
       createdAt: review.createdAt || new Date().toISOString()
     };
     
+    // First save to MySQL / Prisma API backend
+    try {
+      const token = localStorage.getItem('ettadi_admin_token') || sessionStorage.getItem('ettadi_admin_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          id: finalReview.id,
+          productId: finalReview.productId,
+          productTitle: finalReview.productTitle || '',
+          productImage: finalReview.productImage || null,
+          customerName: finalReview.customerName || 'Customer',
+          customerPhone: finalReview.customerPhone || 'N/A',
+          email: finalReview.email || null,
+          rating: Number(finalReview.rating) || 5,
+          comment: finalReview.comment || '',
+          images: Array.isArray(finalReview.images) ? JSON.stringify(finalReview.images) : null
+        })
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        return {
+          ...finalReview,
+          ...saved,
+          images: saved.images ? (typeof saved.images === 'string' ? JSON.parse(saved.images) : saved.images) : []
+        };
+      }
+    } catch (apiErr) {
+      console.warn('API review save failed, falling back to local/cloud:', apiErr);
+    }
+
     if (isFirebaseEnabled && db) {
       try {
         await setDoc(doc(db, 'reviews', finalReview.id), finalReview);
@@ -1416,7 +1450,39 @@ export const dbService = {
     return finalReview;
   },
 
+  async deleteReview(reviewId: string): Promise<boolean> {
+    try {
+      const token = localStorage.getItem('ettadi_admin_token') || sessionStorage.getItem('ettadi_admin_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE', headers });
+    } catch (err) {
+      console.warn('Failed to delete review from API:', err);
+    }
+    const current = getLocalData<Review[]>('noor_reviews', []);
+    setLocalData('noor_reviews', current.filter(r => r.id !== reviewId));
+    return true;
+  },
+
   async getReviews(productId?: string, customerPhone?: string): Promise<Review[]> {
+    // Try Prisma API first
+    try {
+      const url = productId ? `/api/reviews?productId=${encodeURIComponent(productId)}` : '/api/reviews';
+      const res = await fetch(url);
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items)) {
+          const mapped: Review[] = items.map((r: any) => ({
+            ...r,
+            images: r.images ? (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) : []
+          }));
+          return mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API getReviews failed, using local/firebase:', apiErr);
+    }
+
     if (isFirebaseEnabled && db) {
       try {
         const querySnapshot = await getDocs(collection(db, 'reviews'));

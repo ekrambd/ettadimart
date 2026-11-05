@@ -548,12 +548,25 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     return 'home';
   });
   const [selectedCategoryCheckbox, setSelectedCategoryCheckbox] = useState<string>('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('All');
   const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [priceRange, setPriceRange] = useState<number>(50000); // Max range default
   const [quizPrompt, setQuizPrompt] = useState<string>('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 15;
+
+  const [dbBrandsList, setDbBrandsList] = useState<any[]>([]);
+  const [dbCategoriesList, setDbCategoriesList] = useState<any[]>([]);
+
+  useEffect(() => {
+    publicStoreService.getBrands().then(data => {
+      if (Array.isArray(data)) setDbBrandsList(data);
+    }).catch(() => {});
+    publicStoreService.getCategories().then(data => {
+      if (Array.isArray(data)) setDbCategoriesList(data);
+    }).catch(() => {});
+  }, []);
 
   // Dynamic Ecom Settings with instant session rehydration
   const [ecomSettings, setEcomSettings] = useState<EcomSettings | null>(() => {
@@ -1272,10 +1285,11 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
       const matchesCategory = selectedCategoryCheckbox === 'All' || (() => {
         const cat = selectedCategoryCheckbox.toLowerCase();
         const pCat = (p.category || '').toLowerCase();
+        const pSubCat = (p.subCategory || '').toLowerCase();
         const pSeries = (p.series || '').toLowerCase();
         const pTitle = (p.title || '').toLowerCase();
 
-        if (pCat === cat || pSeries === cat) return true;
+        if (pCat === cat || pSubCat === cat || pSeries === cat) return true;
         
         // Smart keyword fallbacks for China imported variety e-commerce
         if (cat.includes('gadget') || cat.includes('গ্যাজেট')) return pCat.includes('gadget') || pTitle.includes('গ্যাজেট') || pTitle.includes('লাইট') || pTitle.includes('চার্জার') || pTitle.includes('ব্লেন্ডার');
@@ -1286,7 +1300,15 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
         if (cat.includes('trending') || cat.includes('ট্রেন্ডিং')) return Boolean(p.isFeatured || p.isNewArrival || pTitle.includes('ট্রেন্ডিং'));
         if (cat === 'popular') return Boolean(p.isFeatured || (p.rating && p.rating >= 4.5) || pTitle.includes('popular'));
 
-        return pCat.includes(cat) || pSeries.includes(cat) || pTitle.includes(cat);
+        return pCat.includes(cat) || pSubCat.includes(cat) || pSeries.includes(cat) || pTitle.includes(cat);
+      })();
+
+      const matchesSubCategory = selectedSubCategory === 'All' || (() => {
+        const sub = selectedSubCategory.toLowerCase();
+        const pSubCat = (p.subCategory || '').toLowerCase();
+        const pTitle = (p.title || '').toLowerCase();
+        const pCat = (p.category || '').toLowerCase();
+        return pSubCat === sub || pTitle.includes(sub) || pCat.includes(sub);
       })();
         
       const matchesBrand = selectedBrand === 'All' || 
@@ -1294,60 +1316,159 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
         
       const matchesPrice = p.price <= priceRange;
 
-      return matchesSearch && matchesCategory && matchesBrand && matchesPrice;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesBrand && matchesPrice;
     }).sort((a, b) => {
       if (sortBy === 'price-asc') return a.price - b.price;
       if (sortBy === 'price-desc') return b.price - a.price;
       return 0;
     });
-  }, [products, searchTerm, selectedCategoryCheckbox, selectedBrand, priceRange, sortBy]);
+  }, [products, searchTerm, selectedCategoryCheckbox, selectedSubCategory, selectedBrand, priceRange, sortBy]);
 
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredCatalog.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredCatalog, currentPage]);
 
+  // Shop categories: Show ONLY top-level / parent categories (no subcategories mixed in)
   const shopCategories = useMemo(() => {
     const set = new Set<string>();
+    
+    // 1. Gather all sub-category names or IDs so we can exclude them from the root category list
+    const subCatNamesLower = new Set<string>();
+    dbCategoriesList.forEach(c => {
+      if (c && c.parentId && c.name) {
+        subCatNamesLower.add(c.name.trim().toLowerCase());
+      }
+    });
+
     if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems)) {
       ecomSettings.categoryItems.forEach(c => {
-        if (c?.name && c.name.trim()) set.add(c.name.trim());
+        if (c?.parentId && c.name) {
+          subCatNamesLower.add(c.name.trim().toLowerCase());
+        }
       });
     }
+
+    // 2. Add root categories from dbCategoriesList
+    dbCategoriesList.forEach(c => {
+      if (c && !c.parentId && c.name && c.name.trim()) {
+        set.add(c.name.trim());
+      }
+    });
+
+    // 3. Add root categories from ecomSettings.categoryItems
+    if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems)) {
+      ecomSettings.categoryItems.forEach(c => {
+        if (c?.name && c.name.trim() && !c.parentId && !subCatNamesLower.has(c.name.trim().toLowerCase())) {
+          set.add(c.name.trim());
+        }
+      });
+    }
+
+    // 4. Add root categories from ecomSettings.categories
     if (ecomSettings?.categories && Array.isArray(ecomSettings.categories)) {
       ecomSettings.categories.forEach(c => {
-        if (typeof c === 'string' && c.trim()) set.add(c.trim());
-        else if (typeof c === 'object' && (c as any).name) set.add((c as any).name.trim());
+        const name = typeof c === 'string' ? c.trim() : (c as any)?.name?.trim();
+        if (name && !subCatNamesLower.has(name.toLowerCase())) {
+          set.add(name);
+        }
       });
     }
+
+    // 5. Products root categories
     products.forEach(p => {
-      if (p.category && p.category.trim()) set.add(p.category.trim());
-      if (p.series && p.series.trim()) set.add(p.series.trim());
+      if (p.category && p.category.trim() && !subCatNamesLower.has(p.category.trim().toLowerCase())) {
+        set.add(p.category.trim());
+      }
     });
+
     const custom = Array.from(set);
     return custom.length > 0 ? ['All', ...custom] : ['All'];
-  }, [products, ecomSettings?.categoryItems, ecomSettings?.categories]);
+  }, [products, ecomSettings?.categoryItems, ecomSettings?.categories, dbCategoriesList]);
 
-  // Dynamic Categories strictly from Admin Panel and Live Catalog (Not Static)
+  // Available sub-categories for currently selected category
+  const activeSubCategories = useMemo(() => {
+    if (selectedCategoryCheckbox === 'All') return [];
+
+    const subSet = new Set<string>();
+
+    // 1. Find parent category in dbCategoriesList or categoryItems
+    const parent = dbCategoriesList.find(c => 
+      c.name?.trim().toLowerCase() === selectedCategoryCheckbox.trim().toLowerCase() && !c.parentId
+    ) || (ecomSettings?.categoryItems || []).find(c => 
+      c.name?.trim().toLowerCase() === selectedCategoryCheckbox.trim().toLowerCase() && !c.parentId
+    );
+
+    if (parent) {
+      // Find children matching parent.id
+      dbCategoriesList.forEach(c => {
+        if (c.parentId === parent.id && c.name && c.name.trim()) {
+          subSet.add(c.name.trim());
+        }
+      });
+      (ecomSettings?.categoryItems || []).forEach(c => {
+        if (c.parentId === parent.id && c.name && c.name.trim()) {
+          subSet.add(c.name.trim());
+        }
+      });
+    }
+
+    // 2. Also inspect products in this category that have subCategory assigned
+    products.forEach(p => {
+      if (p.category?.trim().toLowerCase() === selectedCategoryCheckbox.trim().toLowerCase()) {
+        if (p.subCategory && p.subCategory.trim()) {
+          subSet.add(p.subCategory.trim());
+        }
+      }
+    });
+
+    return Array.from(subSet);
+  }, [selectedCategoryCheckbox, dbCategoriesList, ecomSettings?.categoryItems, products]);
+
+  // Dynamic Categories strictly from Admin Panel and Live Catalog (Not Static) - Only Root/Parent Categories
   const headerCategories = useMemo(() => {
     const list: string[] = [];
     const seen = new Set<string>();
+
+    // Gather subcategory names to exclude
+    const subCatNamesLower = new Set<string>();
+    dbCategoriesList.forEach(c => {
+      if (c && c.parentId && c.name) {
+        subCatNamesLower.add(c.name.trim().toLowerCase());
+      }
+    });
+    if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems)) {
+      ecomSettings.categoryItems.forEach(c => {
+        if (c?.parentId && c.name) {
+          subCatNamesLower.add(c.name.trim().toLowerCase());
+        }
+      });
+    }
 
     const addCat = (rawName?: string) => {
       if (!rawName || typeof rawName !== 'string') return;
       const trimmed = rawName.trim();
       if (!trimmed || trimmed.toLowerCase() === 'all') return;
       const lower = trimmed.toLowerCase();
+      if (subCatNamesLower.has(lower)) return; // Exclude subcategories
       if (!seen.has(lower)) {
         seen.add(lower);
         list.push(trimmed);
       }
     };
 
+    // 0. Primary source: database categories
+    if (Array.isArray(dbCategoriesList) && dbCategoriesList.length > 0) {
+      const rootDbCats = dbCategoriesList.filter(c => !c.parentId);
+      rootDbCats.forEach(c => addCat(c.name));
+    }
+
     // 1. Categories configured in Admin Panel CategoryManager (categoryItems)
     if (Array.isArray(ecomSettings?.categoryItems) && ecomSettings.categoryItems.length > 0) {
       const sorted = [...ecomSettings.categoryItems].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      sorted.forEach(c => addCat(c.name));
+      sorted.forEach(c => {
+        if (!c.parentId) addCat(c.name);
+      });
     }
 
     // 2. Categories string array from Admin Panel (ecomSettings.categories)
@@ -1367,13 +1488,21 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     }
 
     return list;
-  }, [ecomSettings?.categoryItems, ecomSettings?.categories, products]);
+  }, [ecomSettings?.categoryItems, ecomSettings?.categories, products, dbCategoriesList]);
 
 
 
   const shopBrands = useMemo(() => {
-    return ['All', ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))];
-  }, [products]);
+    const set = new Set<string>();
+    dbBrandsList.forEach(b => {
+      if (b && b.name && b.name.trim()) set.add(b.name.trim());
+    });
+    products.forEach(p => {
+      if (p.brand && p.brand.trim()) set.add(p.brand.trim());
+    });
+    const list = Array.from(set);
+    return list.length > 0 ? ['All', ...list] : ['All'];
+  }, [products, dbBrandsList]);
 
   const categoryScrollRef = useRef<HTMLDivElement>(null);
 
@@ -1384,11 +1513,47 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     }
   };
 
+  // Recommended Categories (Circular Showcase on Home Page) - Only Top-Level Root Categories
   const displayCategories = useMemo(() => {
+    // Collect subcategory IDs/names to ensure child subcategories are NEVER displayed in top-level categories
+    const subCatNamesLower = new Set<string>();
+    dbCategoriesList.forEach(c => {
+      if (c && c.parentId && c.name) {
+        subCatNamesLower.add(c.name.trim().toLowerCase());
+      }
+    });
+    if (ecomSettings?.categoryItems && Array.isArray(ecomSettings.categoryItems)) {
+      ecomSettings.categoryItems.forEach(c => {
+        if (c?.parentId && c.name) {
+          subCatNamesLower.add(c.name.trim().toLowerCase());
+        }
+      });
+    }
+
+    // 0. Primary source: Direct categories from DB (/api/categories)
+    if (Array.isArray(dbCategoriesList) && dbCategoriesList.length > 0) {
+      const rootDbCats = dbCategoriesList.filter(c => !c.parentId && c.name && c.name.trim());
+      if (rootDbCats.length > 0) {
+        return rootDbCats.map((item, idx) => {
+          const catName = item.name.trim();
+          const matchedProd = products.find(p => 
+            p.category?.toLowerCase() === catName.toLowerCase()
+          );
+          const resolvedImage = item.image || matchedProd?.image || (matchedProd as any)?.coverImage || '';
+          return {
+            id: item.id || `cat-db-${idx}`,
+            name: catName,
+            targetCategory: catName,
+            image: resolvedImage
+          };
+        });
+      }
+    }
+
     // 1. Categories configured in Admin Panel CategoryManager (categoryItems)
     if (Array.isArray(ecomSettings?.categoryItems) && ecomSettings.categoryItems.length > 0) {
       const activeItems = ecomSettings.categoryItems
-        .filter(item => item && item.name && item.name.trim().length > 0)
+        .filter(item => item && item.name && item.name.trim().length > 0 && !item.parentId && !subCatNamesLower.has(item.name.trim().toLowerCase()))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
       if (activeItems.length > 0) {
@@ -1396,8 +1561,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
           const catName = item.name.trim();
           // Find matching product image if category item doesn't have an uploaded image
           const matchedProd = products.find(p => 
-            p.category?.toLowerCase() === catName.toLowerCase() ||
-            p.subCategory?.toLowerCase() === catName.toLowerCase()
+            p.category?.toLowerCase() === catName.toLowerCase()
           );
           const resolvedImage = item.image || matchedProd?.image || (matchedProd as any)?.coverImage || '';
           return {
@@ -1414,13 +1578,12 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     if (Array.isArray(ecomSettings?.categories) && ecomSettings.categories.length > 0) {
       const catNames = ecomSettings.categories
         .map(c => (typeof c === 'string' ? c.trim() : (c as any)?.name?.trim()))
-        .filter(Boolean) as string[];
+        .filter(name => Boolean(name) && !subCatNamesLower.has(name!.toLowerCase())) as string[];
 
       if (catNames.length > 0) {
         return catNames.map((catName, idx) => {
           const matchedProd = products.find(p => 
-            p.category?.toLowerCase() === catName.toLowerCase() ||
-            p.subCategory?.toLowerCase() === catName.toLowerCase()
+            p.category?.toLowerCase() === catName.toLowerCase()
           );
           const resolvedImage = matchedProd?.image || (matchedProd as any)?.coverImage || '';
           return {
@@ -1433,9 +1596,13 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
       }
     }
 
-    // 3. Fallback to distinct categories derived from real products in DB
+    // 3. Fallback to distinct categories derived from real products in DB (excluding subcategories)
     if (Array.isArray(products) && products.length > 0) {
-      const distinctCats = Array.from(new Set(products.map(p => p.category?.trim()).filter(Boolean) as string[]));
+      const distinctCats = Array.from(new Set(
+        products
+          .map(p => p.category?.trim())
+          .filter(c => Boolean(c) && !subCatNamesLower.has(c!.toLowerCase())) as string[]
+      ));
       if (distinctCats.length > 0) {
         return distinctCats.map((catName, idx) => {
           const matchedProd = products.find(p => p.category?.toLowerCase() === catName.toLowerCase());
@@ -1452,7 +1619,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
 
     // If no real categories exist, return empty array (no fake or static data)
     return [];
-  }, [ecomSettings?.categoryItems, ecomSettings?.categories, products]);
+  }, [ecomSettings?.categoryItems, ecomSettings?.categories, products, dbCategoriesList]);
 
 
 
@@ -2505,6 +2672,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                           checked={selectedCategoryCheckbox === cat}
                           onChange={() => {
                             setSelectedCategoryCheckbox(cat);
+                            setSelectedSubCategory('All');
                             setCurrentPage(1);
                           }}
                           className="w-4 h-4 rounded text-[#F37022] focus:ring-[#F37022] border-slate-300 cursor-pointer"
@@ -2572,6 +2740,69 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
             </div>
 
             <div className="lg:col-span-9 space-y-6">
+              {/* Horizontal Subcategories Bar (shown when a category with subcategories is selected) */}
+              {selectedCategoryCheckbox !== 'All' && activeSubCategories.length > 0 && (
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#F37022]" />
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                        Subcategories for <span className="text-[#F37022]">{selectedCategoryCheckbox}</span>
+                      </h3>
+                    </div>
+                    {selectedSubCategory !== 'All' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubCategory('All');
+                          setCurrentPage(1);
+                        }}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                      >
+                        Clear subcategory filter
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSubCategory('All');
+                        setCurrentPage(1);
+                      }}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                        selectedSubCategory === 'All'
+                          ? 'bg-[#F37022] text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      All {selectedCategoryCheckbox}
+                    </button>
+                    {activeSubCategories.map((subName) => {
+                      const isSelected = selectedSubCategory.toLowerCase() === subName.toLowerCase();
+                      return (
+                        <button
+                          key={subName}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubCategory(subName);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#F37022] text-white shadow-xs ring-2 ring-[#F37022]/30'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {subName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="text-xs text-slate-500 font-medium">
                   {filteredCatalog.length === 0 ? (
@@ -3046,6 +3277,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                       key={cat.id || idx}
                       onClick={() => {
                         setSelectedCategoryCheckbox(cat.name);
+                        setSelectedSubCategory('All');
                         setCurrentPage(1);
                         navigateTo('shop');
                       }}
@@ -3920,6 +4152,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                           type="button"
                           onClick={() => {
                             setSelectedCategoryCheckbox(catName);
+                            setSelectedSubCategory('All');
                             setIsMobileMenuOpen(false);
                             setCurrentPage(1);
                             if (activeNav !== 'shop') navigateTo('shop');

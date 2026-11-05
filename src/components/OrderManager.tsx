@@ -1295,6 +1295,10 @@ export default function OrderManager({
           setViewingOrder({ ...viewingOrder, status: newStatus });
         }}
         onEditOrder={openEditOrder}
+        onDeleteOrder={async (id) => {
+          await onDeleteOrder(id);
+          setViewingOrder(null);
+        }}
       />
     );
   }

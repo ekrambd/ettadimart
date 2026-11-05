@@ -200,13 +200,27 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
 }
 
 // GET All Products - Direct DB Query (No seed data, no local cache)
+// Supports ?brand=..., ?category=..., ?subCategory=...
 productRouter.get('/', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
   try {
+    const { brand, category, subCategory } = req.query;
+    const where: any = {};
+    if (brand && typeof brand === 'string' && brand !== 'All') {
+      where.brand = brand;
+    }
+    if (category && typeof category === 'string' && category !== 'All') {
+      where.category = category;
+    }
+    if (subCategory && typeof subCategory === 'string' && subCategory !== 'All') {
+      where.subCategory = subCategory;
+    }
+
     const products = await prisma.product.findMany({
+      where,
       orderBy: { createdAt: 'desc' }
     });
     res.json(products.map(formatProduct));
