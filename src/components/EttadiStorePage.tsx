@@ -17,7 +17,7 @@ import { DEFAULT_ABOUT_SETTINGS, DEFAULT_DELIVERY_METHODS, DEFAULT_PAYMENT_GATEW
 import { ProductSearchEngine, HANBANG_INGREDIENT_DATABASE, IngredientMeta } from '../lib/searchIndex';
 import { useAppStore } from '../store/useAppStore';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { updateMetaTags, updateProductSchema, updateBreadcrumbSchema, getProductSlug } from '../lib/seoUtils';
+import { updateMetaTags, updateProductSchema, updateBreadcrumbSchema, getProductSlug, slugifyProductText } from '../lib/seoUtils';
 import ResponsiveImage from './ResponsiveImage';
 import CheckoutPage from './CheckoutPage';
 import { SkinQuizView } from './SkinQuizView';
@@ -186,13 +186,28 @@ function EttadiProductCard({
 
   const cardImage = selectedVariant?.image || product.coverImage || product.image || DEFAULT_FANTINE_FALLBACK_IMAGE;
 
+  // Crawlable semantic product URL for search engines and new-tab navigation
+  const productSlug = getProductSlug(product);
+  const productUrl = `/product/${encodeURIComponent(productSlug)}`;
+
+  const handleProductLinkClick = (e: React.MouseEvent) => {
+    // Allow Cmd+click / Ctrl+click / Middle click to open real product link in new tab
+    if (e.metaKey || e.ctrlKey || e.button === 1 || e.shiftKey) {
+      return;
+    }
+    e.preventDefault();
+    onOpenDetail(product);
+  };
+
   return (
-    <div className="group flex flex-col bg-white rounded-[6px] border border-slate-200/90 hover:border-slate-300 hover:shadow-lg transition-all duration-300 p-3 sm:p-3.5 overflow-hidden justify-between">
+    <div className="group flex flex-col bg-white rounded-xl border border-slate-200 hover:border-orange-300 hover:shadow-lg transition-all duration-300 p-3 sm:p-3.5 overflow-hidden justify-between">
       <div>
-        {/* Product Image Area - Scale Full Width Cover */}
-        <div 
-          className="relative aspect-square w-full bg-slate-50 rounded-[6px] overflow-hidden mb-3 cursor-pointer group/img select-none" 
-          onClick={() => onOpenDetail(product)}
+        {/* Product Image Area - Scale Full Width Cover (Crawlable Link) */}
+        <a 
+          href={productUrl}
+          onClick={handleProductLinkClick}
+          className="relative aspect-square w-full bg-slate-50 rounded-lg overflow-hidden mb-3 cursor-pointer group/img select-none block" 
+          title={product.title}
         >
           {/* Dynamic Top Promotional Ribbon if configured in DB */}
           {product.badge && (
@@ -215,19 +230,22 @@ function EttadiProductCard({
 
           {/* Top Right Discount Badge if applicable */}
           {hasDiscount && discountPercent > 0 && (
-            <span className={`absolute ${product.badge ? 'top-6' : 'top-2'} right-2 bg-[#F37022] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] shadow-xs`}>
+            <span className={`absolute ${product.badge ? 'top-6' : 'top-2'} right-2 bg-[#F37022] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow-xs`}>
               ↓ {discountPercent}%
             </span>
           )}
-        </div>
+        </a>
 
-        {/* Product Title */}
-        <h3 
-          onClick={() => onOpenDetail(product)}
-          className="text-[13px] sm:text-sm text-slate-900 hover:text-[#F37022] transition-colors cursor-pointer font-semibold leading-snug line-clamp-2 min-h-[2.5rem]"
-          title={product.title}
-        >
-          {product.title}
+        {/* Product Title (Crawlable Link) */}
+        <h3 className="text-[13px] sm:text-sm text-slate-900 hover:text-[#F37022] transition-colors font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">
+          <a
+            href={productUrl}
+            onClick={handleProductLinkClick}
+            className="text-inherit hover:text-[#F37022] transition-colors no-underline block"
+            title={product.title}
+          >
+            {product.title}
+          </a>
         </h3>
         
         {/* Price Row: Discount % + Strikethrough + Bold Price */}
@@ -296,25 +314,25 @@ function EttadiProductCard({
             e.stopPropagation();
             onAddToCart(product, 1, selectedVariant || undefined);
           }}
-          className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-orange-200 active:scale-95 rounded-[6px] transition-all cursor-pointer flex items-center justify-center shadow-2xs group/btn"
+          className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-orange-200 active:scale-95 rounded-lg transition-all cursor-pointer flex items-center justify-center shadow-2xs group/btn"
           title="Add to Cart"
           aria-label="Add to Cart"
         >
           <ShoppingCart className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2] group-hover/btn:scale-110 transition-transform" />
         </button>
 
-        {/* Buy Now Button Feature */}
+        {/* Buy Now Button Feature (Cartup Style Instant Buy) */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onBuyNow(product, selectedVariant || undefined);
           }}
-          className="flex-1 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.98] text-white font-bold text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-[6px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-orange-500/20 whitespace-nowrap"
-          title="Buy Now"
+          className="flex-1 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.98] text-white font-bold text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-orange-500/20 whitespace-nowrap"
+          title="অর্ডার করুন (Buy Now)"
         >
           <Zap className="w-3.5 h-3.5 fill-current" />
-          <span>Buy Now</span>
+          <span>অর্ডার করুন</span>
         </button>
       </div>
     </div>
@@ -539,6 +557,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     if (typeof window !== 'undefined') {
       const p = window.location.pathname;
       if (p.startsWith('/product')) return 'product_detail';
+      if (p.startsWith('/category')) return 'shop';
       if (p.startsWith('/shop')) return 'shop';
       if (p.startsWith('/about')) return 'about';
       if (p.startsWith('/contact')) return 'contact';
@@ -568,8 +587,11 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     }).catch(() => {});
   }, []);
 
-  // Dynamic Ecom Settings with instant session rehydration
+  // Dynamic Ecom Settings with instant server preload & session rehydration
   const [ecomSettings, setEcomSettings] = useState<EcomSettings | null>(() => {
+    if (typeof window !== 'undefined' && (window as any).__INITIAL_SETTINGS__) {
+      return (window as any).__INITIAL_SETTINGS__;
+    }
     try {
       const cached = sessionStorage.getItem('ettadi_cached_settings');
       if (cached) return JSON.parse(cached);
@@ -661,6 +683,47 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [selectedVariant, setSelectedVariant] = useState<any | null>(null);
   const [detailQuantity, setDetailQuantity] = useState<number>(1);
+
+  // "More from this Seller" State & Horizontal Scroller Ref
+  const [moreFromSellerData, setMoreFromSellerData] = useState<{
+    seller: {
+      id?: string;
+      name?: string;
+      slug?: string;
+      logo?: string;
+      phone?: string;
+      positiveRating?: number;
+      isVerified?: boolean;
+    } | null;
+    products: FantineProductItem[];
+  }>({ seller: null, products: [] });
+  const sellerScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollSellerProducts = (direction: 'left' | 'right') => {
+    if (sellerScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -300 : 300;
+      sellerScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    if (activeProductDetail?.id) {
+      dbService.getMoreFromSeller(activeProductDetail.id)
+        .then(res => {
+          if (res && res.products) {
+            setMoreFromSellerData({
+              seller: res.seller || null,
+              products: (res.products || []).map((p, idx) => normalizeFantineProduct(p, idx))
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load more from seller:', err);
+        });
+    } else {
+      setMoreFromSellerData({ seller: null, products: [] });
+    }
+  }, [activeProductDetail?.id]);
 
 
   // Sync Live Settings from dbService & publicStoreService
@@ -788,6 +851,29 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
       window.removeEventListener('storage', handleProductUpdate);
     };
   }, []);
+
+  // Sync category filter from /category/:slug URL for deep-linking & search engine crawling
+  useEffect(() => {
+    if (location.pathname.startsWith('/category/')) {
+      const rawSlug = decodeURIComponent(location.pathname.replace(/^\/category\/?/, '')).trim().toLowerCase();
+      if (rawSlug) {
+        const availableCats: string[] = [
+          ...(ecomSettings?.categories || []),
+          ...(ecomSettings?.categoryItems?.map(c => c.name) || []),
+          ...(dbCategoriesList.map(c => c.name) || [])
+        ];
+        const match = availableCats.find(c => slugifyProductText(c) === rawSlug || c.toLowerCase() === rawSlug);
+        if (match) {
+          setSelectedCategoryCheckbox(match);
+        } else {
+          setSelectedCategoryCheckbox(rawSlug);
+        }
+        setSelectedSubCategory('All');
+        setCurrentPage(1);
+        setActiveNav('shop');
+      }
+    }
+  }, [location.pathname, ecomSettings, dbCategoriesList]);
 
   // General States
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -1991,7 +2077,12 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
       {/* ============================================================
           MAIN STORE HEADER (Unified Across Marketplace)
           ============================================================ */}
-      <StoreHeader activeNav={activeNav === 'quiz' ? 'home' : activeNav} />
+      <StoreHeader 
+        activeNav={activeNav === 'quiz' ? 'home' : activeNav} 
+        onNavigate={(nav) => navigateTo(nav as any)}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenTracking={() => setIsOrderTrackingOpen(true)}
+      />
 
 
 
@@ -2357,24 +2448,26 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                       </button>
                     </div>
 
-                    {/* Button 2: Order on WhatsApp (Solid Green Full Width) */}
+                    {/* Button 2: Order on WhatsApp (Solid Green Full Width with Real WhatsApp Icon) */}
                     <a
                       href={`https://wa.me/${whatsappNum}?text=${whatsappOrderMessage}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-full bg-[#16a34a] hover:bg-[#15803d] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2.5"
                     >
-                      <MessageCircle className="w-5 h-5 fill-current" />
+                      <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
                       <span>Order on WhatsApp</span>
                     </a>
                   </div>
 
-                  {/* Authentic Guarantee Badge */}
-                  <div className="p-3 bg-orange-50/70 rounded-[6px] border border-orange-200/80 flex items-center gap-3">
-                    <ShieldCheck className="w-5 h-5 text-[#F37022] shrink-0" />
-                    <span className="text-xs text-slate-800 font-medium">
+                  {/* Authentic Guarantee Badge (Generous Padding & Safe Line-Height for Bengali Glyphs) */}
+                  <div className="py-3 px-3.5 sm:py-3.5 sm:px-4 bg-orange-50/80 rounded-xl border border-orange-200/90 flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-[#F37022] shrink-0 mt-0.5" />
+                    <p className="text-xs sm:text-[13px] text-slate-800 font-medium leading-relaxed m-0">
                       ১০০% অরিজিনাল কোয়ালিটি ও ফাস্ট ডেলিভারির নিশ্চয়তা। সারা দেশে ক্যাশ অন ডেলিভারি সুবিধা।
-                    </span>
+                    </p>
                   </div>
 
                   {/* Single Clean Professional Product Description (Zero Duplication) */}
@@ -2410,6 +2503,233 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
               );
             })()}
 
+          </div>
+
+          {/* ============================================================
+              SELLER SHOWCASE & MORE FROM THIS SELLER (Cartup / Daraz Style)
+              ============================================================ */}
+          <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-slate-200/80">
+            {/* Ask questions to seller banner */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between text-xs sm:text-sm text-slate-600 mb-4 shadow-2xs">
+              <div>
+                <button 
+                  type="button" 
+                  onClick={() => setIsProfileOpen(true)}
+                  className="text-sky-600 hover:text-sky-700 font-bold hover:underline cursor-pointer"
+                >
+                  Login
+                </button>
+                <span className="mx-1 text-slate-400">or</span>
+                <button 
+                  type="button" 
+                  onClick={() => setIsProfileOpen(true)}
+                  className="text-sky-600 hover:text-sky-700 font-bold hover:underline cursor-pointer"
+                >
+                  Register
+                </button>
+                <span className="ml-1 text-slate-600">to ask questions to seller</span>
+              </div>
+            </div>
+
+            {/* Seller Store Card */}
+            {(() => {
+              const sellerName = moreFromSellerData.seller?.name || activeProductDetail.vendorName || activeProductDetail.brand || displayStoreName || 'Ettadi Mart Official Store';
+              const sellerLogo = moreFromSellerData.seller?.logo || displayStoreLogo || '/ettadimart-favicon.svg';
+              const positiveRating = moreFromSellerData.seller?.positiveRating || 96;
+
+              return (
+                <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-full border border-slate-200 overflow-hidden bg-white shrink-0 flex items-center justify-center p-1 shadow-xs">
+                      <img
+                        src={sellerLogo}
+                        alt={sellerName}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = '/ettadimart-favicon.svg';
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                        {sellerName}
+                      </h3>
+                      <div className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                        <span className="font-bold text-slate-800">{positiveRating}%</span>
+                        <span>positive seller rating</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rawPhone = moreFromSellerData.seller?.phone || ecomSettings?.supportWhatsapp || '01911910246';
+                        const digits = rawPhone.replace(/[^0-9]/g, '');
+                        const phoneWithCode = digits.startsWith('88') ? digits : '88' + digits;
+                        const text = encodeURIComponent(`Hello, I have a question about ${activeProductDetail.title}`);
+                        window.open(`https://wa.me/${phoneWithCode}?text=${text}`, '_blank');
+                      }}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-bold text-xs sm:text-sm transition-colors cursor-pointer border border-cyan-200/70 shadow-2xs"
+                    >
+                      <MessageCircle className="w-4 h-4 text-cyan-600" />
+                      <span>Chat with Seller</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const slug = moreFromSellerData.seller?.slug || 'official-store';
+                        navigate(`/shops/${slug}`);
+                        scrollToTop();
+                      }}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs sm:text-sm transition-colors cursor-pointer border border-pink-200/70 shadow-2xs"
+                    >
+                      <span>Visit Store</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* More from this Seller Carousel */}
+            {moreFromSellerData.products.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    More from this Seller
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => scrollSellerProducts('left')}
+                      className="w-8 h-8 rounded-full border border-slate-200/90 flex items-center justify-center bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer shadow-2xs"
+                      aria-label="Previous products"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollSellerProducts('right')}
+                      className="w-8 h-8 rounded-full border border-slate-200/90 flex items-center justify-center bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer shadow-2xs"
+                      aria-label="Next products"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div 
+                  ref={sellerScrollRef}
+                  className="flex items-stretch gap-3 sm:gap-4 overflow-x-auto scrollbar-none pb-2 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth"
+                >
+                  {moreFromSellerData.products.map((item) => {
+                    const discountPct = item.originalPrice && item.originalPrice > item.price
+                      ? Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)
+                      : null;
+                    const rating = (4.8 + ((item.id.charCodeAt(0) % 3) * 0.1)).toFixed(1);
+                    const reviewCount = 20 + (item.id.charCodeAt(item.id.length - 1) % 300);
+
+                    return (
+                      <div
+                        key={`seller-prod-${item.id}`}
+                        className="w-[195px] sm:w-[215px] md:w-[230px] shrink-0 bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
+                      >
+                        <div>
+                          {/* Promo Ribbon */}
+                          <div className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white font-black text-[10px] sm:text-[11px] px-2 py-1 flex items-center justify-center gap-1 uppercase tracking-tight shadow-xs">
+                            <span>⚡ BUY ANY 3 GET FREE DELIVERY</span>
+                          </div>
+
+                          {/* Image */}
+                          <div 
+                            onClick={() => {
+                              openProductDetail(item);
+                              scrollToTop();
+                            }}
+                            className="relative aspect-square w-full bg-slate-50 overflow-hidden cursor-pointer flex items-center justify-center p-3"
+                          >
+                            <img
+                              src={item.coverImage || item.image || DEFAULT_FANTINE_FALLBACK_IMAGE}
+                              alt={item.title}
+                              className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
+                              }}
+                            />
+
+                            <div className="absolute bottom-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-xs">
+                              <span>{rating}</span>
+                              <Star className="w-2.5 h-2.5 fill-current" />
+                              <span className="opacity-90">{reviewCount}</span>
+                            </div>
+                          </div>
+
+                          {/* Info */}
+                          <div className="p-3">
+                            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                              <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded tracking-wide">
+                                FAST
+                              </span>
+                              <span className="bg-[#1e3a8a] text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                <span>Verified</span>
+                              </span>
+                            </div>
+
+                            <h4 
+                              onClick={() => {
+                                openProductDetail(item);
+                                scrollToTop();
+                              }}
+                              className="text-xs sm:text-[13px] font-medium text-slate-800 line-clamp-2 hover:text-[#F37022] cursor-pointer min-h-[34px] leading-snug"
+                            >
+                              {item.title}
+                            </h4>
+
+                            <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+                              {discountPct ? (
+                                <span className="text-pink-600 text-xs font-bold">
+                                  ↓ {discountPct}%
+                                </span>
+                              ) : null}
+                              {item.originalPrice && item.originalPrice > item.price ? (
+                                <span className="text-slate-400 text-xs line-through">
+                                  ৳{item.originalPrice}
+                                </span>
+                              ) : null}
+                              <span className="text-base font-bold text-pink-600">
+                                ৳{item.price}
+                              </span>
+                            </div>
+
+                            <div className="mt-0.5 text-[10px] text-emerald-700 font-semibold">
+                              FREE delivery
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Add to Cart button */}
+                        <div className="p-3 pt-0">
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(item, 1)}
+                            className="w-full py-2 bg-cyan-100 hover:bg-cyan-200 text-cyan-800 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>Add to Cart</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ============================================================
@@ -3080,6 +3400,9 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                             <img 
                               src={leftImage} 
                               alt="Promotional Banner" 
+                              loading="eager"
+                              fetchPriority="high"
+                              decoding="async"
                               className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-500 cursor-pointer"
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
@@ -3139,6 +3462,9 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                             <img 
                               src={rightImage} 
                               alt="Special Offer Banner" 
+                              loading="eager"
+                              fetchPriority="high"
+                              decoding="async"
                               className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-500"
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
@@ -3231,6 +3557,49 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                       </div>
                     </div>
                   </div>
+
+                  {/* Cartup-Style 4-Item Value Proposition Features Grid */}
+                  <div className="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-orange-50 text-[#F37022] flex items-center justify-center shrink-0">
+                        <Truck className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">সারা দেশে ক্যাশ অন ডেলিভারি</h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">পণ্য হাতে পেয়ে চেক করে পেমেন্ট</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">১০০% কোয়ালিটি নিশ্চিত</h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">সরাসরি চায়না ফ্যাক্টরি থেকে আমদানিকৃত</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <CreditCard className="w-5 h-5 stroke-[2.2]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">সবচেয়ে সাশ্রয়ী মূল্য</h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">পাইকারি ও খুচরা মূল্যে গ্যাজেটস</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <Zap className="w-5 h-5 stroke-[2.2] fill-amber-500" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">৭ দিনের সহজ রিটার্ন</h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">সমস্যা হলে দ্রুত রিপ্লেসমেন্ট সুবিধা</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
             );
@@ -3272,45 +3641,53 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                   ref={categoryScrollRef}
                   className="flex items-start gap-4 sm:gap-6 lg:gap-8 overflow-x-auto scrollbar-none scroll-smooth pb-3"
                 >
-                  {displayCategories.map((cat, idx) => (
-                    <div
-                      key={cat.id || idx}
-                      onClick={() => {
-                        setSelectedCategoryCheckbox(cat.name);
-                        setSelectedSubCategory('All');
-                        setCurrentPage(1);
-                        navigateTo('shop');
-                      }}
-                      className="flex flex-col items-center shrink-0 w-24 sm:w-28 md:w-32 cursor-pointer group select-none"
-                    >
-                      {/* Circular Avatar */}
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden bg-slate-50 border border-slate-200/80 shadow-2xs group-hover:shadow-md group-hover:scale-105 group-hover:border-[#F37022] transition-all duration-300 flex items-center justify-center">
-                        {cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt={cat.name}
-                            loading="lazy"
-                            className="w-full h-full object-cover rounded-full transition-transform duration-300 group-hover:scale-110"
-                            onError={(e) => {
-                              // If image fails, fallback to Tag icon
-                              e.currentTarget.style.display = 'none';
-                              const fallback = e.currentTarget.parentElement?.querySelector('.category-fallback-icon');
-                              if (fallback) (fallback as HTMLElement).style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className={`category-fallback-icon w-full h-full items-center justify-center bg-orange-50/60 text-[#F37022] font-bold text-lg sm:text-xl ${cat.image ? 'hidden' : 'flex'}`}
-                        >
-                          <Tag className="w-7 h-7 sm:w-8 sm:h-8 text-[#F37022]/70" />
+                  {displayCategories.map((cat, idx) => {
+                    const catSlug = slugifyProductText(cat.name || 'category');
+                    return (
+                      <a
+                        key={cat.id || idx}
+                        href={`/category/${encodeURIComponent(catSlug)}`}
+                        onClick={(e) => {
+                          if (!e.metaKey && !e.ctrlKey && e.button === 0 && !e.shiftKey) {
+                            e.preventDefault();
+                            setSelectedCategoryCheckbox(cat.name);
+                            setSelectedSubCategory('All');
+                            setCurrentPage(1);
+                            navigateTo('shop');
+                          }
+                        }}
+                        className="flex flex-col items-center shrink-0 w-24 sm:w-28 md:w-32 cursor-pointer group select-none no-underline"
+                        title={cat.name}
+                      >
+                        {/* Circular Avatar */}
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden bg-slate-50 border border-slate-200/80 shadow-2xs group-hover:shadow-md group-hover:scale-105 group-hover:border-[#F37022] transition-all duration-300 flex items-center justify-center">
+                          {cat.image ? (
+                            <img
+                              src={cat.image}
+                              alt={cat.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover rounded-full transition-transform duration-300 group-hover:scale-110"
+                              onError={(e) => {
+                                // If image fails, fallback to Tag icon
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.parentElement?.querySelector('.category-fallback-icon');
+                                if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`category-fallback-icon w-full h-full items-center justify-center bg-orange-50/60 text-[#F37022] font-bold text-lg sm:text-xl ${cat.image ? 'hidden' : 'flex'}`}
+                          >
+                            <Tag className="w-7 h-7 sm:w-8 sm:h-8 text-[#F37022]/70" />
+                          </div>
                         </div>
-                      </div>
-                      {/* Category Label */}
-                      <span className="text-xs sm:text-[13px] font-semibold text-slate-800 text-center mt-2 group-hover:text-[#F37022] transition-colors line-clamp-1 w-full px-1">
-                        {cat.name}
-                      </span>
-                    </div>
-                  ))}
+                        {/* Category Label */}
+                        <span className="text-xs sm:text-[13px] font-semibold text-slate-800 text-center mt-2 group-hover:text-[#F37022] transition-colors line-clamp-1 w-full px-1">
+                          {cat.name}
+                        </span>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             </section>

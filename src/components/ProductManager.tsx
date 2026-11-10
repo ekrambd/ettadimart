@@ -1330,7 +1330,10 @@ export default function ProductManager({
 
             <button
               type="button"
-              onClick={() => setActiveTab('attributes')}
+              onClick={() => {
+                setActiveTab('attributes');
+                dbService.getAttributes().then(attrs => setStoreAttributes(attrs || [])).catch(() => {});
+              }}
               className={`py-3 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
                 activeTab === 'attributes' ? 'border-emerald-600 text-emerald-700 font-extrabold bg-emerald-50/40 rounded-t-lg' : 'border-transparent hover:text-slate-900 hover:bg-slate-50 rounded-t-lg'
               }`}
@@ -2055,9 +2058,14 @@ export default function ProductManager({
                             <Sliders className="w-4 h-4" />
                           </div>
                           <div>
-                            <h4 className="text-base font-bold text-slate-900">Attributes</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-base font-bold text-slate-900">Attributes</h4>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Active Only ({((storeAttributes || []).filter(a => a?.status === true || a?.status === 1 || a?.status === '1' || a?.status === 'true')).length})
+                              </span>
+                            </div>
                             <p className="text-xs text-slate-500">
-                              Colour, size, material and the like. Select attributes for variants.
+                              Colour, size, material and the like. Select active attributes for product variants.
                             </p>
                           </div>
                         </div>
@@ -2071,14 +2079,22 @@ export default function ProductManager({
 
                       <div className="space-y-6">
                         {(() => {
-                          const activeAttributes = (storeAttributes || []).filter(attr => attr.status !== false);
+                          const isAttrActive = (attr: any): boolean => {
+                            return Boolean(attr && (attr.status === true || attr.status === 1 || attr.status === '1' || attr.status === 'true'));
+                          };
+                          const activeAttributes = (storeAttributes || []).filter(isAttrActive);
                           if (activeAttributes.length === 0) {
                             return (
-                              <div className="py-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-1">
-                                <p className="text-xs font-bold text-slate-600">No active attributes found.</p>
-                                <p className="text-[11px] text-slate-400">
-                                  Go to Catalogue &gt; Attributes and click "Activate" on any attribute you want to use here.
-                                </p>
+                              <div className="py-10 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2.5">
+                                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto">
+                                  <Sliders className="w-5 h-5" />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs font-bold text-slate-700">No active attributes found</p>
+                                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                                    All attributes are currently marked Inactive. To use attributes for this product, go to <strong>Catalogue &gt; Attributes</strong> and click <strong>Activate</strong> on the attributes you need.
+                                  </p>
+                                </div>
                               </div>
                             );
                           }

@@ -10,6 +10,7 @@
     "backup:create": "node --import tsx scripts/disasterRecovery.ts create",
     "backup:list": "node --import tsx scripts/disasterRecovery.ts list",
     "backup:restore": "node --import tsx scripts/disasterRecovery.ts restore",
+    "db:migrate:postgres": "tsx scripts/migrate-to-postgres.ts",
     "build": "node scripts/generate-sitemap.cjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild src/server/clusterServer.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/clusterServer.cjs",
     "start": "node dist/server.cjs",
     "postinstall": "prisma generate",

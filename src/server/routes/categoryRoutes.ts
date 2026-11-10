@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/adminAuth';
+import { cacheService } from '../services/cacheService';
 
 export const categoryRouter = Router();
 
@@ -54,6 +55,7 @@ categoryRouter.post('/', requireAdmin, async (req, res) => {
       }
     });
     res.status(201).json(item);
+    cacheService.invalidateCatalog().catch(() => {});
   } catch (error: any) {
     console.error('Failed to create category:', error);
     res.status(500).json({ error: error.message || 'Failed to create category' });
@@ -83,6 +85,7 @@ categoryRouter.put('/:id', requireAdmin, async (req, res) => {
       }
     });
     res.json(item);
+    cacheService.invalidateCatalog().catch(() => {});
   } catch (error: any) {
     console.error('Failed to update category:', error);
     res.status(500).json({ error: error.message || 'Failed to update category' });
@@ -100,6 +103,7 @@ categoryRouter.delete('/:id', requireAdmin, async (req, res) => {
     await (prisma as any).category.delete({
       where: { id }
     });
+    cacheService.invalidateCatalog().catch(() => {});
     res.json({ success: true, message: 'Category removed successfully' });
   } catch (error: any) {
     console.error('Failed to delete category:', error);

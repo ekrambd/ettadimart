@@ -1,85 +1,95 @@
-import type { Request, Response, NextFunction } from 'express';
+/**
+ * In-Memory High-Throughput Sliding Window Rate Limiter
+ * Ettadi Mart Enterprise Scaling Suite
+ * 
+ * Protects server from burst bot flooding, order scalping, and DDoS
+ * Zero external package dependency (runs 100% in memory)
+ */
 
-interface RateLimitRecord {
+import { Request, Response, NextFunction } from 'express';
+
+interface ClientRecord {
   count: number;
-  resetTime: number;
+  resetAt: number;
 }
+
+const ipMap = new Map<string, ClientRecord>();
+
+// Periodic memory garbage collection every 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of ipMap.entries()) {
+    if (record.resetAt <= now) {
+      ipMap.delete(ip);
+    }
+  }
+}, 60000).unref();
 
 export function createRateLimiter(options: {
   windowMs: number;
-  max: number;
+  maxRequests: number;
   message?: string;
-  statusCode?: number;
 }) {
-  const {
-    windowMs,
-    max,
-    message = 'Too many requests. Please wait a moment and try again.',
-    statusCode = 429
-  } = options;
-
-  const hits = new Map<string, RateLimitRecord>();
-
-  // Periodically clean up expired entries every 2 minutes
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, record] of hits.entries()) {
-      if (now > record.resetTime) {
-        hits.delete(ip);
-      }
-    }
-  }, 2 * 60 * 1000);
-
-  // Unref interval so it does not block process exit
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
-  }
+  const { windowMs, maxRequests, message } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const rawIp = req.header('cf-connecting-ip') || 
-                  req.header('x-forwarded-for')?.split(',')[0] || 
-                  req.ip || 
-                  req.socket.remoteAddress || 
-                  'unknown';
-    const ip = String(rawIp).trim();
+    // Whitelist static assets, health checks, and localhost
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 
+               req.socket.remoteAddress || 
+               'unknown-client';
+
+    if (ip === '127.0.0.1' || ip === '::1' || req.path.startsWith('/health')) {
+      return next();
+    }
+
+    const key = `${ip}:${req.baseUrl || req.path}`;
     const now = Date.now();
+    const existing = ipMap.get(key);
 
-    const record = hits.get(ip);
-
-    if (!record || now > record.resetTime) {
-      hits.set(ip, {
+    if (!existing || existing.resetAt <= now) {
+      ipMap.set(key, {
         count: 1,
-        resetTime: now + windowMs
+        resetAt: now + windowMs
       });
       return next();
     }
 
-    record.count += 1;
-
-    if (record.count > max) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((record.resetTime - now) / 1000));
-      res.setHeader('Retry-After', retryAfterSeconds);
-      return res.status(statusCode).json({
-        success: false,
-        error: message,
-        retryAfterSeconds
+    if (existing.count >= maxRequests) {
+      const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+      res.setHeader('Retry-After', retryAfter);
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', 0);
+      res.status(429).json({
+        error: message || 'Too many requests. Please slow down and try again shortly.',
+        retryAfterSeconds: retryAfter
       });
+      return;
     }
 
+    existing.count++;
+    res.setHeader('X-RateLimit-Limit', maxRequests);
+    res.setHeader('X-RateLimit-Remaining', maxRequests - existing.count);
     next();
   };
 }
 
-/** Anti-spam limiter for order checkout: Max 6 checkout attempts per minute per IP */
-export const checkoutRateLimiter = createRateLimiter({
+// Global General API Limiter: 300 requests per minute
+export const apiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  max: 6,
-  message: 'Order submission limit reached. Please wait a minute before placing another order.'
+  maxRequests: 300,
+  message: 'API rate limit exceeded. Please wait a moment.'
 });
 
-/** Anti brute-force limiter for admin & customer logins: Max 10 attempts per 5 minutes per IP */
+// Checkout & Order Creation Limiter: 25 orders per minute per IP
+export const checkoutRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 25,
+  message: 'Checkout rate limit exceeded. Please wait a moment before submitting again.'
+});
+
+// Admin Auth Login Limiter: 10 login attempts per minute (Anti-brute-force)
 export const authRateLimiter = createRateLimiter({
-  windowMs: 5 * 60 * 1000,
-  max: 10,
-  message: 'Too many login attempts. Please wait 5 minutes before trying again.'
+  windowMs: 60 * 1000,
+  maxRequests: 10,
+  message: 'Too many login attempts. Please wait 1 minute before trying again.'
 });

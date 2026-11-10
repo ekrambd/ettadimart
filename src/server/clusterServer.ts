@@ -13,7 +13,7 @@ const numCPUs = process.env.WORKER_COUNT ? parseInt(process.env.WORKER_COUNT, 10
  */
 if (cluster.isPrimary || (cluster as any).isMaster) {
   console.log('====================================================');
-  console.log('🚀 NOOR ENTERPRISE MULTI-SERVER CLUSTER MANAGER');
+  console.log('🚀 ETTADI MART ENTERPRISE MULTI-CORE CLUSTER MANAGER');
   console.log(`⚡ Primary PID ${process.pid} is online`);
   console.log(`⚡ Forking ${numCPUs} worker processes (Detected ${os.cpus().length} CPU cores)...`);
   console.log('====================================================\n');

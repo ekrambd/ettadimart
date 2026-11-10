@@ -830,6 +830,30 @@ export const dbService = {
     window.dispatchEvent(new Event('ecom-products-updated'));
   },
 
+  async getMoreFromSeller(productId: string): Promise<{ seller: any; products: Product[] }> {
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(productId)}/more-from-seller`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Failed to fetch more products from seller:', e);
+    }
+    return {
+      seller: {
+        id: 'official',
+        name: 'Ettadi Mart Official Store',
+        slug: 'official',
+        logo: '/ettadimart-favicon.svg',
+        phone: '01726275850',
+        positiveRating: 96,
+        isVerified: true,
+        totalProducts: 0
+      },
+      products: []
+    };
+  },
+
   async recordProductView(_productId: string): Promise<number> {
     // Disabled to optimize performance and prevent unnecessary Firestore quota usage
     return 0;
@@ -1844,18 +1868,26 @@ export const dbService = {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setLocalData('noor_attributes', data);
-          return data;
+          const normalized = data.map((item: any) => ({
+            ...item,
+            status: item.status === true || item.status === 1 || item.status === '1' || item.status === 'true'
+          }));
+          setLocalData('noor_attributes', normalized);
+          return normalized;
         }
       }
     } catch {}
 
-    return getLocalData<ProductAttribute[]>('noor_attributes', [
+    const fallback = getLocalData<ProductAttribute[]>('noor_attributes', [
       { id: 'attr-1', name: 'Pack Quantity', values: ['20', '50', '100', '200'], status: false },
       { id: 'attr-2', name: 'Liquid Volume', values: ['50 ml', '100 ml', '250 ml', '500 ml'], status: false },
       { id: 'attr-3', name: 'Weight / Pack', values: ['250g', '500g', '1kg', '2kg'], status: false },
       { id: 'attr-4', name: 'Clothing Size', values: ['S', 'M', 'L', 'XL', 'XXL'], status: true }
     ]);
+    return fallback.map((item: any) => ({
+      ...item,
+      status: item.status === true || item.status === 1 || item.status === '1' || item.status === 'true'
+    }));
   },
 
   async saveAttribute(attr: Partial<ProductAttribute>): Promise<ProductAttribute> {

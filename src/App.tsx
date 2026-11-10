@@ -189,6 +189,7 @@ function AppRoutes() {
             <Route path="/checkout" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
             <Route path="/product/:slug" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
             <Route path="/product/:slug/:id" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
+            <Route path="/category/:slug" element={<EttadiStorePage onGoToLogin={() => navigate('/login')} onGoToLanding={() => navigate('/book')} />} />
             <Route path="/fantine" element={<Navigate to="/" replace />} />
             
             {/* Fix Duplicate Content: Canonical Redirects for legacy .html routes */}

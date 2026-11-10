@@ -12,6 +12,7 @@ attributeRouter.get('/', async (_req, res) => {
     });
     const parsed = items.map((item: any) => ({
       ...item,
+      status: item.status === true || item.status === 1 || item.status === '1' || item.status === 'true',
       values: item.values ? JSON.parse(item.values) : []
     }));
     res.json(parsed);
@@ -33,11 +34,12 @@ attributeRouter.post('/', requireAdmin, async (req, res) => {
       data: {
         name,
         values: Array.isArray(values) ? JSON.stringify(values) : JSON.stringify([]),
-        status: status !== undefined ? Boolean(status) : true
+        status: status !== undefined ? Boolean(status) : false // Inactive by default
       }
     });
     res.status(201).json({
       ...created,
+      status: Boolean(created.status),
       values: created.values ? JSON.parse(created.values) : []
     });
   } catch (error: any) {

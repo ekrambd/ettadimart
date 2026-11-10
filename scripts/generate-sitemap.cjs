@@ -52,19 +52,51 @@ async function generateSitemap() {
 
   // Default store catalog products for offline/Firestore-free builds
   let productsToInclude = [];
+  let categoriesToInclude = [];
 
   try {
     const Database = require('better-sqlite3');
     const dbPath = path.join(__dirname, '../prisma/ettadimart.db');
     if (fs.existsSync(dbPath)) {
       const db = new Database(dbPath, { readonly: true });
-      const rows = db.prepare('SELECT id, title, slug FROM Product').all();
-      db.close();
+      const rows = db.prepare('SELECT id, title, slug, category FROM Product').all();
       if (Array.isArray(rows)) {
         productsToInclude = rows;
       }
+
+      try {
+        const catRows = db.prepare('SELECT id, name, slug FROM Category WHERE isActive = 1 OR isActive IS NULL').all();
+        if (Array.isArray(catRows)) {
+          categoriesToInclude = catRows;
+        }
+      } catch (err) {}
+
+      db.close();
     }
   } catch (e) {}
+
+  // Include Category URLs in Sitemap (High Priority for Search Indexing)
+  categoriesToInclude.forEach(cat => {
+    const slug = slugify(cat.slug || cat.name);
+    if (!slug) return;
+    const loc = `https://ettadimart.com/category/${encodeURIComponent(slug)}`;
+    if (!urls.some(u => u.loc === loc)) {
+      urls.push({ loc, priority: '0.9', changefreq: 'daily' });
+    }
+  });
+
+  // Also include distinct product categories
+  productsToInclude.forEach(prod => {
+    if (prod.category) {
+      const catSlug = slugify(prod.category);
+      if (catSlug) {
+        const loc = `https://ettadimart.com/category/${encodeURIComponent(catSlug)}`;
+        if (!urls.some(u => u.loc === loc)) {
+          urls.push({ loc, priority: '0.9', changefreq: 'daily' });
+        }
+      }
+    }
+  });
 
   productsToInclude.forEach(prod => {
     const slug = slugify(prod.slug || prod.title || prod.id);

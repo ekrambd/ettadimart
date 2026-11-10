@@ -122,11 +122,16 @@ export default function AttributesManager() {
     setIsModalOpen(true);
   };
 
+  // Helper: check if attribute is active (default is false / inactive)
+  const isAttrActive = (a: { status?: any }): boolean => {
+    return Boolean(a && (a.status === true || a.status === 1 || a.status === '1' || a.status === 'true'));
+  };
+
   const handleOpenEdit = (attr: ProductAttribute) => {
     setEditingAttr(attr);
     setName(attr.name);
     setValuesList(Array.isArray(attr.values) ? [...attr.values] : []);
-    setStatus(attr.status !== false);
+    setStatus(isAttrActive(attr));
     setUnitSuffix('');
     setCustomInput('');
     setIsModalOpen(true);
@@ -252,7 +257,7 @@ export default function AttributesManager() {
 
   // Direct card action: Toggle status and move to appropriate filter tab
   const handleDirectToggleStatus = async (attr: ProductAttribute) => {
-    const updatedStatus = attr.status === false ? true : false;
+    const updatedStatus = !isAttrActive(attr);
     try {
       await dbService.saveAttribute({
         ...attr,
@@ -320,16 +325,16 @@ export default function AttributesManager() {
 
   // Status counts for tab badges
   const inactiveCount = useMemo(() => {
-    return attributes.filter(a => a.status === false).length;
+    return attributes.filter(a => !isAttrActive(a)).length;
   }, [attributes]);
 
   const activeCount = useMemo(() => {
-    return attributes.filter(a => a.status !== false).length;
+    return attributes.filter(a => isAttrActive(a)).length;
   }, [attributes]);
 
   // Filtered attributes by status filter and search term
   const filteredAttributes = attributes.filter(a => {
-    const isActive = a.status !== false;
+    const isActive = isAttrActive(a);
     if (statusFilter === 'inactive' && isActive) return false;
     if (statusFilter === 'active' && !isActive) return false;
 
@@ -563,7 +568,7 @@ export default function AttributesManager() {
             const vals = attr.values || [];
             const quickInput = cardInputs[attr.id] || '';
             const isCopied = copiedId === attr.id;
-            const isActive = attr.status !== false;
+            const isActive = isAttrActive(attr);
 
             return (
               <div
@@ -734,7 +739,7 @@ export default function AttributesManager() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredAttributes.map((attr) => {
-                  const isActive = attr.status !== false;
+                  const isActive = isAttrActive(attr);
                   return (
                     <tr key={attr.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-4 px-5 font-bold text-slate-900">

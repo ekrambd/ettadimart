@@ -36,6 +36,7 @@ async function injectServerMeta(html: string, reqPath: string, host: string, pro
 
   let keywords = "ettadi mart, ettadimart, ettadi mart bd, ইত্যাদি মার্ট, ইত্তাদি মার্ট, china imported gadgets bd, smart lifestyle bangladesh, kitchen gadgets online shopping bd, smart home tools bangladesh, online shopping bangladesh, ক্যাশ অন ডেলিভারি শপিং, সেরা অনলাইন শপ, চায়না প্রোডাক্ট বাংলাদেশ, trending items bd, variety store dhaka, wholesale china products bd";
   let productSchemaHtml = "";
+  let semanticPrerenderShell = "";
 
   if (reqPath.startsWith('/product')) {
     const rawSeg = reqPath.replace(/^\/product\/?/, '').split('/')[0] || '';
@@ -126,11 +127,168 @@ async function injectServerMeta(html: string, reqPath: string, host: string, pro
             }
           }
         };
-        productSchemaHtml = `<script type="application/ld+json">${JSON.stringify(productSchema)}</script>`;
+
+        const catSlug = (matched.category || 'varieties').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const breadcrumbSchema = {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": `${proto}://${host}/`
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": matched.category || "Varieties",
+              "item": `${proto}://${host}/category/${encodeURIComponent(catSlug)}`
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": matched.title,
+              "item": fullUrl
+            }
+          ]
+        };
+
+        productSchemaHtml = `<script type="application/ld+json">${JSON.stringify(productSchema)}</script>\n  <script type="application/ld+json">${JSON.stringify(breadcrumbSchema)}</script>`;
+
+        const cleanDesc = (matched.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const pImg = image.startsWith('http') ? image : `${proto}://${host}${image.startsWith('/') ? '' : '/'}${image}`;
+
+        // Semantic Crawlable Shell for Googlebot & Search Crawlers
+        semanticPrerenderShell = `
+          <main id="ettadi-prerender-product" style="max-width:1200px;margin:0 auto;padding:24px 16px;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
+            <nav aria-label="Breadcrumb" style="font-size:13px;margin-bottom:16px;color:#64748b;">
+              <a href="/" style="color:#0f172a;text-decoration:none;font-weight:600;">হোম (Home)</a> &gt; 
+              <a href="/category/${encodeURIComponent(catSlug)}" style="color:#0f172a;text-decoration:none;font-weight:600;">${matched.category || 'Varieties'}</a> &gt; 
+              <span>${matched.title}</span>
+            </nav>
+            <div style="display:flex;flex-wrap:wrap;gap:32px;">
+              <div style="flex:1 1 320px;max-width:480px;">
+                <img src="${pImg}" alt="${matched.title}" style="width:100%;height:auto;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);" />
+              </div>
+              <div style="flex:1 1 320px;">
+                <h1 style="font-size:26px;font-weight:800;color:#0f172a;margin:0 0 10px 0;line-height:1.3;">${matched.title}</h1>
+                <p style="font-size:22px;font-weight:800;color:#F37022;margin:0 0 16px 0;">
+                  ৳ ${matched.price || 0} BDT
+                  ${matched.regularPrice ? `<span style="font-size:15px;color:#94a3b8;text-decoration:line-through;margin-left:8px;">৳ ${matched.regularPrice}</span>` : ''}
+                </p>
+                <div style="padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px;font-size:13px;color:#166534;font-weight:600;">
+                  ✓ সারা বাংলাদেশে দ্রুত হোম ডেলিভারি ও ক্যাশ অন ডেলিভারি (Cash on Delivery)<br/>
+                  ✓ ৭ দিনের সহজ রিপ্লেসমেন্ট গ্যারান্টি (7 Days Easy Replacement)
+                </div>
+                <div style="font-size:14px;line-height:1.7;color:#334155;margin-bottom:24px;">
+                  ${cleanDesc || matched.title}
+                </div>
+                <a href="/shop" style="display:inline-block;padding:10px 20px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:700;">
+                  আরও পণ্য দেখুন (View All Products)
+                </a>
+              </div>
+            </div>
+          </main>
+        `;
       }
     } catch (e) {
       // ignore
     }
+  } else if (reqPath.startsWith('/category')) {
+    const rawCatSeg = reqPath.replace(/^\/category\/?/, '').split('/')[0] || '';
+    const cleanCatSeg = decodeURIComponent(rawCatSeg).trim().toLowerCase();
+
+    try {
+      const storeProducts = await prisma.product.findMany();
+      const allCats = await (prisma as any).category.findMany().catch(() => []);
+
+      const matchedCat = allCats.find((c: any) => {
+        const cSlug = (c.slug || c.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return cSlug === cleanCatSeg || c.name.toLowerCase() === cleanCatSeg;
+      });
+      const catDisplayName = matchedCat?.name || cleanCatSeg.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+
+      title = `${catDisplayName} | ${storeName} - China Imported Online Store BD`;
+      description = `Shop authentic ${catDisplayName} online in Bangladesh at ${storeName}. High-quality China imported products, best wholesale & retail price, cash on delivery nationwide.`;
+      keywords = `${catDisplayName}, ${catDisplayName} price in bangladesh, buy ${catDisplayName} bd, ${storeName}, ইত্যাদি মার্ট, online shopping bd`;
+
+      const catProducts = storeProducts.filter((p: any) => {
+        const pCat = (p.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return pCat === cleanCatSeg || (p.category || '').toLowerCase() === catDisplayName.toLowerCase();
+      }).slice(0, 24);
+
+      semanticPrerenderShell = `
+        <article id="ettadi-ssr-shell" style="max-width:1200px;margin:0 auto;padding:24px 16px;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
+          <nav aria-label="Breadcrumb" style="font-size:13px;margin-bottom:16px;color:#64748b;">
+            <a href="/" style="color:#0f172a;text-decoration:none;font-weight:600;">হোম (Home)</a> &gt; 
+            <span>${catDisplayName}</span>
+          </nav>
+          <header style="margin-bottom:24px;">
+            <h1 style="font-size:26px;font-weight:800;color:#0f172a;margin:0 0 8px 0;">${catDisplayName}</h1>
+            <p style="font-size:14px;color:#64748b;margin:0;">${description}</p>
+          </header>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+            ${catProducts.map((p: any) => {
+              const pSlug = (p.slug || p.title || p.id).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              const pImg = p.coverImage || p.image || '/placeholder-product.svg';
+              return `
+                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;">
+                  <a href="/product/${encodeURIComponent(pSlug)}" style="text-decoration:none;color:inherit;display:block;">
+                    <img src="${pImg}" alt="${p.title}" style="width:100%;height:180px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />
+                    <h2 style="font-size:14px;font-weight:700;margin:0 0 6px 0;line-height:1.4;">${p.title}</h2>
+                    <p style="font-size:16px;font-weight:800;color:#F37022;margin:0;">৳ ${p.price || 0}</p>
+                  </a>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </article>
+      `;
+    } catch (e) {}
+  } else if (reqPath === '/' || reqPath === '') {
+    try {
+      const storeProducts = await prisma.product.findMany({ take: 24 });
+      const allCats = await (prisma as any).category.findMany().catch(() => []);
+
+      semanticPrerenderShell = `
+        <article id="ettadi-ssr-shell" style="max-width:1200px;margin:0 auto;padding:24px 16px;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;">
+          <header style="text-align:center;margin-bottom:32px;">
+            <h1 style="font-size:28px;font-weight:800;color:#0f172a;margin:0 0 8px 0;">${storeName} | ইত্যাদি মার্ট</h1>
+            <p style="font-size:15px;color:#64748b;max-width:700px;margin:0 auto;">${description}</p>
+          </header>
+          ${allCats.length > 0 ? `
+            <section style="margin-bottom:36px;">
+              <h2 style="font-size:18px;font-weight:700;margin:0 0 16px 0;color:#0f172a;">শীর্ষ ক্যাটাগরি (Browse Categories)</h2>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                ${allCats.map((c: any) => {
+                  const cSlug = (c.slug || c.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  return `<a href="/category/${encodeURIComponent(cSlug)}" style="display:inline-block;padding:8px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;color:#0f172a;text-decoration:none;font-weight:600;font-size:13px;">${c.name}</a>`;
+                }).join('')}
+              </div>
+            </section>
+          ` : ''}
+          <section>
+            <h2 style="font-size:18px;font-weight:700;margin:0 0 16px 0;color:#0f172a;">জনপ্রিয় পণ্যসমূহ (Featured Products)</h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+              ${storeProducts.map((p: any) => {
+                const pSlug = (p.slug || p.title || p.id).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const pImg = p.coverImage || p.image || '/placeholder-product.svg';
+                return `
+                  <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;">
+                    <a href="/product/${encodeURIComponent(pSlug)}" style="text-decoration:none;color:inherit;display:block;">
+                      <img src="${pImg}" alt="${p.title}" style="width:100%;height:180px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />
+                      <h3 style="font-size:14px;font-weight:700;margin:0 0 6px 0;line-height:1.4;">${p.title}</h3>
+                      <p style="font-size:16px;font-weight:800;color:#F37022;margin:0;">৳ ${p.price || 0}</p>
+                    </a>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </section>
+        </article>
+      `;
+    } catch (e) {}
   } else if (reqPath.startsWith('/shop')) {
     title = `Shop All Variety Products | ${storeName} - China Imported`;
     description = `Explore our complete product catalog of China imported smart gadgets, kitchen tools, personal care and lifestyle items at ${storeName}. Fast cash on delivery in Bangladesh.`;
@@ -155,16 +313,21 @@ async function injectServerMeta(html: string, reqPath: string, host: string, pro
   // Replace Meta Keywords (Dynamic SEO Ranking)
   modified = modified.replace(/<meta name="keywords" content=".*?"\s*\/?>/i, `<meta name="keywords" content="${keywords.replace(/"/g, '&quot;')}" />`);
 
+  // Compute full absolute image URL for Facebook, WhatsApp & Twitter crawlers
+  const absoluteImage = image.startsWith('http')
+    ? image
+    : `${proto}://${host}${image.startsWith('/') ? '' : '/'}${image}`;
+
   // Replace OpenGraph tags
   modified = modified.replace(/<meta property="og:title" content=".*?"\s*\/?>/i, `<meta property="og:title" content="${title}" />`);
   modified = modified.replace(/<meta property="og:description" content=".*?"\s*\/?>/i, `<meta property="og:description" content="${description}" />`);
-  modified = modified.replace(/<meta property="og:image" content=".*?"\s*\/?>/i, `<meta property="og:image" content="${image}" />`);
+  modified = modified.replace(/<meta property="og:image" content=".*?"\s*\/?>/i, `<meta property="og:image" content="${absoluteImage}" />`);
   modified = modified.replace(/<meta property="og:url" content=".*?"\s*\/?>/i, `<meta property="og:url" content="${fullUrl}" />`);
 
   // Replace Twitter card tags
   modified = modified.replace(/<meta name="twitter:title" content=".*?"\s*\/?>/i, `<meta name="twitter:title" content="${title}" />`);
   modified = modified.replace(/<meta name="twitter:description" content=".*?"\s*\/?>/i, `<meta name="twitter:description" content="${description}" />`);
-  modified = modified.replace(/<meta name="twitter:image" content=".*?"\s*\/?>/i, `<meta name="twitter:image" content="${image}" />`);
+  modified = modified.replace(/<meta name="twitter:image" content=".*?"\s*\/?>/i, `<meta name="twitter:image" content="${absoluteImage}" />`);
 
   // Replace or inject Canonical link
   if (modified.includes('<link rel="canonical"')) {
@@ -191,6 +354,30 @@ async function injectServerMeta(html: string, reqPath: string, host: string, pro
   const faviconUrl = uploadedFavicon || '/placeholder-favicon.svg';
   modified = modified.replace(/<link rel="icon" [^>]*>/i, `<link rel="icon" href="${faviconUrl}" />`);
   modified = modified.replace(/<link rel="shortcut icon" [^>]*>/i, `<link rel="shortcut icon" href="${faviconUrl}" />`);
+
+  // 1. Instant LCP Banner Preloading (Eliminates banner loading lag on VPS)
+  const heroLeft = storeSettings?.heroBannerLeftImage || storeSettings?.heroBanners?.[0]?.imageUrl;
+  const heroRight = storeSettings?.heroBannerRightImage || storeSettings?.heroBanners?.[1]?.imageUrl;
+  let heroPreloads = '';
+  if (heroLeft && (reqPath === '/' || reqPath === '')) {
+    const leftPreload = heroLeft.startsWith('http') ? heroLeft : `${proto}://${host}${heroLeft.startsWith('/') ? '' : '/'}${heroLeft}`;
+    heroPreloads += `  <link rel="preload" as="image" href="${leftPreload}" fetchpriority="high" />\n`;
+  }
+  if (heroRight && (reqPath === '/' || reqPath === '')) {
+    const rightPreload = heroRight.startsWith('http') ? heroRight : `${proto}://${host}${heroRight.startsWith('/') ? '' : '/'}${heroRight}`;
+    heroPreloads += `  <link rel="preload" as="image" href="${rightPreload}" fetchpriority="high" />\n`;
+  }
+
+  // 2. Synchronous Store Settings Injection (0ms delay for React First Paint)
+  const safeInitialSettings = JSON.stringify(storeSettings).replace(/</g, '\\u003c');
+  const initialSettingsScript = `  <script>window.__INITIAL_SETTINGS__ = ${safeInitialSettings};</script>\n`;
+
+  modified = modified.replace('</head>', `${heroPreloads}${initialSettingsScript}</head>`);
+
+  // 3. Inject Crawlable Server-Side HTML Content Shell into <div id="root">
+  if (semanticPrerenderShell) {
+    modified = modified.replace('<div id="root">', `<div id="root">\n${semanticPrerenderShell}`);
+  }
 
   return modified;
 }
@@ -452,7 +639,7 @@ async function startServer() {
 
       const host = req.headers.host || 'localhost:3000';
       const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
-      const isMetaRoute = req.path === '/' || req.path.startsWith('/product') || req.path.startsWith('/shop') || req.path.startsWith('/about') || req.path.startsWith('/contact') || req.path.startsWith('/quiz');
+      const isMetaRoute = req.path === '/' || req.path.startsWith('/product') || req.path.startsWith('/category') || req.path.startsWith('/shop') || req.path.startsWith('/about') || req.path.startsWith('/contact') || req.path.startsWith('/quiz');
 
       if (isMetaRoute) {
         const enrichedHtml = await injectServerMeta(html, req.path, host, proto);
@@ -478,9 +665,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Ettadi Mart E-Commerce Server active on http://localhost:${PORT}`);
   });
+
+  // Reverse proxy HTTP Keep-Alive tuning (prevents Cloudflare/Nginx 502 Bad Gateway)
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 }
 
 startServer();

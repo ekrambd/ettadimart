@@ -2,6 +2,8 @@ import express from 'express';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import zlib from 'zlib';
+import { apiRateLimiter, checkoutRateLimiter } from './middleware/rateLimiter';
 import { productRouter } from './routes/productRoutes';
 import { orderRouter } from './routes/orderRoutes';
 import { settingsRouter, courierRouter, facebookRouter } from './routes/settingsRoutes';
@@ -65,6 +67,47 @@ app.use((_req, res, next) => {
 });
 
 app.use(express.json({ limit: '2mb' }));
+
+// ==========================================
+// NATIVE GZIP RESPONSE COMPRESSION (Sub-millisecond)
+// Reduces payload size by up to 85% for high-speed mobile delivery
+// ==========================================
+app.use((req, res, next) => {
+  const acceptEncoding = req.headers['accept-encoding'] || '';
+  if (!acceptEncoding.includes('gzip')) {
+    return next();
+  }
+
+  const origJson = res.json.bind(res);
+  const origSend = res.send.bind(res);
+
+  res.json = (body: any) => {
+    try {
+      const jsonStr = JSON.stringify(body);
+      if (jsonStr.length < 1024) {
+        return origJson(body);
+      }
+      zlib.gzip(Buffer.from(jsonStr), (err, compressed) => {
+        if (err) return origJson(body);
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.removeHeader('Content-Length');
+        origSend(compressed);
+      });
+    } catch {
+      origJson(body);
+    }
+  };
+
+  next();
+});
+
+// ==========================================
+// RATE LIMITING PROTECTION (Anti-Scraping & DDoS Shield)
+// ==========================================
+app.use('/api/orders', checkoutRateLimiter);
+app.use('/api', apiRateLimiter);
 
 // Initialize automated periodic database backups
 backupEngine.startScheduledBackups(6);
