@@ -1840,6 +1840,7 @@ export const dbService = {
       await this.saveEcomSettings(ecom);
     } catch {}
 
+    window.dispatchEvent(new CustomEvent('categories-updated', { detail: updated }));
     return payload;
   },
 
@@ -1861,6 +1862,8 @@ export const dbService = {
       ecom.categories = updated.map(c => c.name);
       await this.saveEcomSettings(ecom);
     } catch {}
+
+    window.dispatchEvent(new CustomEvent('categories-updated', { detail: updated }));
   },
   async getAttributes(): Promise<ProductAttribute[]> {
     try {

@@ -243,10 +243,25 @@ orderRouter.post('/checkout', checkoutRateLimiter, async (req, res) => {
       });
     }
 
-    // 2. Delivery charge from DB settings
+    // 2. Delivery charge from DB settings & Product Free Delivery detection
+    const isAllFreeDelivery = dbProducts.length > 0 && dbProducts.every(p => {
+      let isFree = false;
+      if (p.features) {
+        try {
+          const parsed = JSON.parse(p.features);
+          if (parsed.freeDelivery === true || parsed.isFreeDelivery === true || parsed.deliveryChargeEnabled === false) {
+            isFree = true;
+          }
+        } catch {}
+      }
+      return isFree;
+    });
+
     const settings = await getDbSettings();
     let deliveryFee = 70;
-    if (deliveryZone && String(deliveryZone).toLowerCase().includes('outside')) {
+    if (isAllFreeDelivery) {
+      deliveryFee = 0;
+    } else if (deliveryZone && String(deliveryZone).toLowerCase().includes('outside')) {
       deliveryFee = Number(settings.deliveryChargeOutsideDhaka || 120);
     } else {
       deliveryFee = Number(settings.deliveryChargeInsideDhaka || 70);

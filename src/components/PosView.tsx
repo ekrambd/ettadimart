@@ -108,11 +108,18 @@ export default function PosView({
     } catch {}
   };
 
-  // Distinct categories and brands
+  // Distinct categories and brands (supporting multi-category products)
   const categories = useMemo(() => {
     const set = new Set<string>();
     products.forEach(p => {
-      if (p.category) set.add(p.category);
+      const cats = [
+        ...(Array.isArray((p as any).categories) ? (p as any).categories : []),
+        ...(p.category ? p.category.split(',') : [])
+      ];
+      cats.forEach(c => {
+        const trimmed = String(c).trim();
+        if (trimmed) set.add(trimmed);
+      });
     });
     return ['All', ...Array.from(set)];
   }, [products]);
@@ -141,7 +148,14 @@ export default function PosView({
     }
 
     if (selectedCategory !== 'All') {
-      list = list.filter(p => p.category === selectedCategory);
+      const sel = selectedCategory.toLowerCase();
+      list = list.filter(p => {
+        const cats = [
+          ...(Array.isArray((p as any).categories) ? (p as any).categories : []),
+          ...(p.category ? p.category.split(',') : [])
+        ].map(c => String(c).trim().toLowerCase());
+        return cats.includes(sel) || (p.category && p.category.toLowerCase().includes(sel));
+      });
     }
 
     if (selectedBrand !== 'All') {

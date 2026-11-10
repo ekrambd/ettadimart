@@ -200,140 +200,143 @@ function EttadiProductCard({
   };
 
   return (
-    <div className="group flex flex-col bg-white rounded-xl border border-slate-200 hover:border-orange-300 hover:shadow-lg transition-all duration-300 p-3 sm:p-3.5 overflow-hidden justify-between">
-      <div>
-        {/* Product Image Area - Scale Full Width Cover (Crawlable Link) */}
-        <a 
-          href={productUrl}
-          onClick={handleProductLinkClick}
-          className="relative aspect-square w-full bg-slate-50 rounded-lg overflow-hidden mb-3 cursor-pointer group/img select-none block" 
-          title={product.title}
-        >
-          {/* Dynamic Top Promotional Ribbon if configured in DB */}
-          {product.badge && (
-            <div className="absolute top-0 inset-x-0 z-10 bg-gradient-to-r from-[#F37022] to-amber-600 text-white text-[9px] font-black tracking-wide uppercase py-0.5 px-2 text-center shadow-2xs truncate">
-              {product.badge}
+    <div className="group flex flex-col bg-white rounded-xl border border-slate-200 hover:border-orange-300 hover:shadow-md transition-all duration-300 overflow-hidden justify-between h-full">
+      {/* Product Image Area - 100% Full Width Edge-to-Edge (Crawlable Link) */}
+      <a 
+        href={productUrl}
+        onClick={handleProductLinkClick}
+        className="relative aspect-square w-full bg-slate-50 overflow-hidden cursor-pointer group/img select-none block" 
+        title={product.title}
+      >
+        {/* Dynamic Top Promotional Ribbon if configured in DB */}
+        {product.badge && (
+          <div className="absolute top-0 inset-x-0 z-10 bg-gradient-to-r from-[#F37022] to-amber-600 text-white text-[9px] font-black tracking-wide uppercase py-0.5 px-2 text-center shadow-2xs truncate">
+            {product.badge}
+          </div>
+        )}
+
+        <img 
+          loading="lazy" 
+          decoding="async"
+          src={optimizeImageUrl(cardImage, 500)} 
+          alt={product.title}
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
+          }}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+        />
+
+        {/* Top Right Discount Badge if applicable */}
+        {hasDiscount && discountPercent > 0 && (
+          <span className={`absolute ${product.badge ? 'top-6' : 'top-2.5'} right-2.5 bg-[#F37022] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow-xs`}>
+            ↓ {discountPercent}%
+          </span>
+        )}
+      </a>
+
+      {/* Card Content Details with Padding */}
+      <div className="p-3 sm:p-3.5 flex flex-col flex-1 justify-between">
+        <div>
+          {/* Product Title (Crawlable Link) */}
+          <h3 className="text-[13px] sm:text-sm text-slate-900 hover:text-[#F37022] transition-colors font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">
+            <a
+              href={productUrl}
+              onClick={handleProductLinkClick}
+              className="text-inherit hover:text-[#F37022] transition-colors no-underline block"
+              title={product.title}
+            >
+              {product.title}
+            </a>
+          </h3>
+          
+          {/* Price Row: Discount % + Strikethrough + Bold Price */}
+          <div className="flex items-baseline gap-2 pt-2 pb-0.5">
+            {hasDiscount && (
+              <span className="text-xs font-bold text-[#F37022] shrink-0">
+                ↓ {discountPercent}%
+              </span>
+            )}
+            {regularPrice && regularPrice > currentPrice && (
+              <span className="text-xs text-slate-400 line-through shrink-0">
+                {formatPrice(regularPrice)}
+              </span>
+            )}
+            <span className="text-sm sm:text-base font-extrabold text-slate-900">
+              {formatPrice(currentPrice)}
+            </span>
+          </div>
+
+          {/* Free Delivery Note if enabled for this product */}
+          {isProductFreeDelivery && (
+            <div className="text-[11px] font-normal pb-2 flex items-center">
+              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>FREE delivery</span>
+              </span>
             </div>
           )}
 
-          <img 
-            loading="lazy" 
-            decoding="async"
-            src={optimizeImageUrl(cardImage, 500)} 
-            alt={product.title}
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
-            }}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-          />
+          {/* Size / Weight Variant Selector if available */}
+          {variants.length > 0 && (
+            <div className="pb-2">
+              <div className="flex flex-wrap items-center gap-1">
+                {variants.map((v) => {
+                  const isSelected = selectedVariant?.id === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedVariantId(v.id);
+                      }}
+                      className={`px-2 py-0.5 rounded-[4px] text-[11px] font-semibold transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white'
+                      }`}
+                    >
+                      {v.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          {/* Top Right Discount Badge if applicable */}
-          {hasDiscount && discountPercent > 0 && (
-            <span className={`absolute ${product.badge ? 'top-6' : 'top-2'} right-2 bg-[#F37022] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow-xs`}>
-              ↓ {discountPercent}%
-            </span>
-          )}
-        </a>
-
-        {/* Product Title (Crawlable Link) */}
-        <h3 className="text-[13px] sm:text-sm text-slate-900 hover:text-[#F37022] transition-colors font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">
-          <a
-            href={productUrl}
-            onClick={handleProductLinkClick}
-            className="text-inherit hover:text-[#F37022] transition-colors no-underline block"
-            title={product.title}
-          >
-            {product.title}
-          </a>
-        </h3>
-        
-        {/* Price Row: Discount % + Strikethrough + Bold Price */}
-        <div className="flex items-baseline gap-2 pt-2 pb-0.5">
-          {hasDiscount && (
-            <span className="text-xs font-bold text-[#F37022] shrink-0">
-              ↓ {discountPercent}%
-            </span>
-          )}
-          {regularPrice && regularPrice > currentPrice && (
-            <span className="text-xs text-slate-400 line-through shrink-0">
-              {formatPrice(regularPrice)}
-            </span>
-          )}
-          <span className="text-sm sm:text-base font-extrabold text-slate-900">
-            {formatPrice(currentPrice)}
-          </span>
         </div>
 
-        {/* Free Delivery Note if enabled for this product */}
-        {isProductFreeDelivery && (
-          <div className="text-[11px] font-normal pb-2 flex items-center">
-            <span className="text-emerald-600 font-bold flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>FREE delivery</span>
-            </span>
-          </div>
-        )}
+        {/* Action Buttons: Cart Icon (Add to Cart) + Buy Now Button Feature */}
+        <div className="pt-2 mt-auto flex items-center gap-2">
+          {/* Cart Icon Button (Add to Cart) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product, 1, selectedVariant || undefined);
+            }}
+            className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-orange-200 active:scale-95 rounded-lg transition-all cursor-pointer flex items-center justify-center shadow-2xs group/btn"
+            title="Add to Cart"
+            aria-label="Add to Cart"
+          >
+            <ShoppingCart className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2] group-hover/btn:scale-110 transition-transform" />
+          </button>
 
-        {/* Size / Weight Variant Selector if available */}
-        {variants.length > 0 && (
-          <div className="pb-2">
-            <div className="flex flex-wrap items-center gap-1">
-              {variants.map((v) => {
-                const isSelected = selectedVariant?.id === v.id;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedVariantId(v.id);
-                    }}
-                    className={`px-2 py-0.5 rounded-[4px] text-[11px] font-semibold transition-all cursor-pointer border ${
-                      isSelected
-                        ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white'
-                    }`}
-                  >
-                    {v.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* Action Buttons: Cart Icon (Add to Cart) + Buy Now Button Feature */}
-      <div className="pt-2 mt-auto flex items-center gap-2">
-        {/* Cart Icon Button (Add to Cart) */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToCart(product, 1, selectedVariant || undefined);
-          }}
-          className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 bg-orange-50 hover:bg-orange-100 text-[#F37022] border border-orange-200 active:scale-95 rounded-lg transition-all cursor-pointer flex items-center justify-center shadow-2xs group/btn"
-          title="Add to Cart"
-          aria-label="Add to Cart"
-        >
-          <ShoppingCart className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2] group-hover/btn:scale-110 transition-transform" />
-        </button>
-
-        {/* Buy Now Button Feature (Cartup Style Instant Buy) */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onBuyNow(product, selectedVariant || undefined);
-          }}
-          className="flex-1 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.98] text-white font-bold text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-orange-500/20 whitespace-nowrap"
-          title="অর্ডার করুন (Buy Now)"
-        >
-          <Zap className="w-3.5 h-3.5 fill-current" />
-          <span>অর্ডার করুন</span>
-        </button>
+          {/* Buy Now Button Feature (Cartup Style Instant Buy) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuyNow(product, selectedVariant || undefined);
+            }}
+            className="flex-1 bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.98] text-white font-bold text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shadow-orange-500/20 whitespace-nowrap"
+            title="অর্ডার করুন (Buy Now)"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>অর্ডার করুন</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1461,11 +1464,18 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
       });
     }
 
-    // 5. Products root categories
+    // 5. Products root categories (supporting multi-category products)
     products.forEach(p => {
-      if (p.category && p.category.trim() && !subCatNamesLower.has(p.category.trim().toLowerCase())) {
-        set.add(p.category.trim());
-      }
+      const pCats = [
+        ...(Array.isArray((p as any).categories) ? (p as any).categories : []),
+        ...(p.category ? p.category.split(',') : [])
+      ];
+      pCats.forEach(c => {
+        const trimmed = String(c).trim();
+        if (trimmed && !subCatNamesLower.has(trimmed.toLowerCase())) {
+          set.add(trimmed);
+        }
+      });
     });
 
     const custom = Array.from(set);
@@ -1706,6 +1716,104 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
     // If no real categories exist, return empty array (no fake or static data)
     return [];
   }, [ecomSettings?.categoryItems, ecomSettings?.categories, products, dbCategoriesList]);
+
+  // Vibrant paint highlighter color palettes for category titles
+  const PAINT_PALETTES = useMemo(() => [
+    'from-amber-200 via-orange-200 to-yellow-200',
+    'from-rose-200 via-pink-200 to-amber-200',
+    'from-emerald-200 via-teal-200 to-yellow-200',
+    'from-orange-200 via-amber-200 to-orange-300',
+    'from-cyan-200 via-sky-200 to-teal-200',
+    'from-violet-200 via-fuchsia-200 to-rose-200',
+  ], []);
+
+  // Category-wise products grouping for homepage carousels (max 15 products per category)
+  const categoryProductSections = useMemo(() => {
+    if (!products || products.length === 0) return [];
+
+    // Group products by their categories (supporting products assigned to multiple categories)
+    const categoryMap = new Map<string, FantineProductItem[]>();
+    for (const prod of products) {
+      const rawCat = (prod.category || prod.series || 'General').trim();
+      if (!rawCat) continue;
+
+      const catList: string[] = [];
+      if (Array.isArray((prod as any).categories) && (prod as any).categories.length > 0) {
+        (prod as any).categories.forEach((c: any) => {
+          const t = String(c).trim();
+          if (t && !catList.includes(t)) catList.push(t);
+        });
+      } else {
+        rawCat.split(',').forEach(c => {
+          const t = c.trim();
+          if (t && !catList.includes(t)) catList.push(t);
+        });
+      }
+
+      for (const singleCat of catList) {
+        if (!categoryMap.has(singleCat)) {
+          categoryMap.set(singleCat, []);
+        }
+        if (!categoryMap.get(singleCat)!.some(p => p.id === prod.id)) {
+          categoryMap.get(singleCat)!.push(prod);
+        }
+      }
+    }
+
+    const sections: {
+      category: string;
+      slug: string;
+      products: FantineProductItem[];
+    }[] = [];
+
+    const added = new Set<string>();
+
+    // 1. Prioritize categories in displayCategories order
+    if (Array.isArray(displayCategories) && displayCategories.length > 0) {
+      for (const cat of displayCategories) {
+        const name = cat.name.trim();
+        const lower = name.toLowerCase();
+        if (added.has(lower)) continue;
+
+        const prods = categoryMap.get(name) || 
+          Array.from(categoryMap.entries()).find(([k]) => k.toLowerCase() === lower)?.[1] || [];
+
+        if (prods.length > 0) {
+          sections.push({
+            category: name,
+            slug: slugifyProductText(name),
+            products: prods.slice(0, 15)
+          });
+          added.add(lower);
+        }
+      }
+    }
+
+    // 2. Add remaining categories from products
+    for (const [catName, prods] of categoryMap.entries()) {
+      const lower = catName.toLowerCase();
+      if (added.has(lower)) continue;
+      if (prods.length > 0) {
+        sections.push({
+          category: catName,
+          slug: slugifyProductText(catName),
+          products: prods.slice(0, 15)
+        });
+        added.add(lower);
+      }
+    }
+
+    return sections;
+  }, [products, displayCategories]);
+
+  // Smooth scroll handler for category carousel tracks
+  const handleScrollCategoryTrack = (slug: string, direction: 'left' | 'right') => {
+    const track = document.getElementById(`cat-carousel-track-${slug}`);
+    if (track) {
+      const scrollAmount = direction === 'left' ? -320 : 320;
+      track.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
 
 
@@ -2251,55 +2359,69 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
 
               return (
                 <div className="lg:col-span-5 space-y-4 sm:space-y-5">
-                  {/* Category / Series Tag */}
-                  {activeProductDetail.series && (
-                    <span className="inline-block px-2.5 py-1 bg-orange-50 text-[#F37022] text-[11px] font-bold uppercase tracking-wider rounded-[6px] border border-orange-200">
-                      {activeProductDetail.series}
+                  {/* Category / Series Tag & Stock Status */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {activeProductDetail.series && (
+                      <span className="inline-flex items-center px-2.5 py-1 bg-orange-50 text-[#F37022] text-[11px] font-bold uppercase tracking-wider rounded-lg border border-orange-200/80">
+                        {activeProductDetail.series}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg border border-emerald-200/80">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      In Stock / রেডি স্টক
                     </span>
-                  )}
+                  </div>
 
                   {/* Title */}
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl text-slate-900 font-bold tracking-tight leading-snug">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl text-slate-900 font-extrabold tracking-tight leading-snug">
                     {activeProductDetail.title}
                   </h1>
 
                   {/* Vendor / Merchant Badge */}
-                  <div className="flex items-center gap-2 text-xs py-0.5">
+                  <div className="flex flex-wrap items-center gap-2.5 text-xs">
                     <span className="text-slate-500 font-medium">Sold by:</span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-full font-bold text-[11px] border border-slate-200 transition-colors">
-                      <Store className="w-3 h-3 text-[#F37022]" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200/80 text-slate-800 rounded-full font-bold text-[11px] border border-slate-200 transition-colors">
+                      <Store className="w-3.5 h-3.5 text-[#F37022]" />
                       <span>{activeProductDetail.vendorName || displayStoreName || 'Ettadi Mart Official'}</span>
                     </span>
-                    <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-0.5">
-                      <ShieldCheck className="w-3.5 h-3.5" />
+                    <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-4 h-4" />
                       Verified Seller
                     </span>
                   </div>
 
-                  {/* Optional Short Subtitle (Only if genuinely distinct from description and title) */}
+                  {/* Optional Short Subtitle */}
                   {activeProductDetail.subtitle && 
                    activeProductDetail.subtitle.trim() !== activeProductDetail.title.trim() &&
                    activeProductDetail.subtitle.trim() !== cleanDescription && (
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                    <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
                       {activeProductDetail.subtitle}
                     </p>
                   )}
 
-                  {/* Price Row: Bold Dark Current Price + Strikethrough Regular Price */}
-                  <div className="flex flex-wrap items-baseline gap-3 py-1">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                      {formatPrice(effectivePrice)}
-                    </span>
-                    {effectiveRegularPrice && effectiveRegularPrice > effectivePrice && (
-                      <span className="text-base sm:text-lg text-slate-400 line-through">
-                        {formatPrice(effectiveRegularPrice)}
-                      </span>
-                    )}
-                    {effectiveDiscount && (
-                      <span className="text-xs bg-orange-100 text-[#F37022] font-bold px-2 py-0.5 rounded-[4px]">
-                        {effectiveDiscount}% OFF
-                      </span>
-                    )}
+                  {/* Modern Price Card */}
+                  <div className="bg-gradient-to-r from-orange-50/70 via-amber-50/40 to-transparent p-4 rounded-2xl border border-orange-100/90 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Price / মূল্য</span>
+                      <div className="flex items-baseline gap-3 mt-0.5">
+                        <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#F37022] tracking-tight">
+                          {formatPrice(effectivePrice)}
+                        </span>
+                        {effectiveRegularPrice && effectiveRegularPrice > effectivePrice && (
+                          <span className="text-sm sm:text-base text-slate-400 line-through font-medium">
+                            {formatPrice(effectiveRegularPrice)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {effectiveDiscount ? (
+                      <div className="flex flex-col items-end">
+                        <span className="px-3 py-1 bg-[#F37022] text-white text-xs sm:text-sm font-black rounded-full shadow-xs">
+                          {effectiveDiscount}% OFF
+                        </span>
+                        <span className="text-[10px] text-slate-500 mt-1 font-semibold">Special Offer</span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Weight / Variant Selector (বাছাই করুন:) */}
@@ -2307,10 +2429,10 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                     <div className="space-y-2.5 pt-2 border-t border-slate-100">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-slate-800">
-                          সাইজ বা ভ্যারিয়েন্ট বাছাই করুন: {currentVariant && <span className="text-[#F37022] font-bold">{currentVariant.name}</span>}
+                          ভ্যারিয়েন্ট বাছাই করুন: {currentVariant && <span className="text-[#F37022] font-bold">{currentVariant.name}</span>}
                         </label>
                         {currentVariant?.price ? (
-                          <span className="text-xs font-bold text-slate-950 bg-amber-100/90 px-2.5 py-0.5 rounded-[4px] border border-amber-300">
+                          <span className="text-xs font-bold text-slate-900 bg-amber-100/90 px-2.5 py-0.5 rounded-md border border-amber-300">
                             {formatPrice(currentVariant.price)}
                           </span>
                         ) : null}
@@ -2331,15 +2453,15 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                                   }
                                 }
                               }}
-                              className={`px-3.5 py-2 rounded-[6px] text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
+                              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
                                 isSelected
-                                  ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs ring-1 ring-[#F37022] font-bold'
+                                  ? 'bg-orange-50 text-[#F37022] border-orange-300 shadow-2xs ring-1 ring-[#F37022]'
                                   : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                               }`}
                             >
                               <span>{v.name}</span>
                               {v.price > 0 && (
-                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-[4px] ${
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
                                   isSelected ? 'bg-orange-100 text-[#F37022] font-bold' : 'bg-slate-100 text-slate-700 border border-slate-200'
                                 }`}>
                                   {formatPrice(v.price)}
@@ -2353,73 +2475,33 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                   )}
 
                   {/* Quantity Stepper: [-] 1 [+] */}
-                  <div className="flex items-center gap-3 pt-1">
-                    <span className="text-xs font-bold text-slate-700">Quantity:</span>
-                    <div className="inline-flex items-center border border-slate-300 rounded-[6px] overflow-hidden bg-white shadow-2xs">
+                  <div className="flex items-center gap-4 pt-1">
+                    <span className="text-xs sm:text-sm font-bold text-slate-800">Quantity / পরিমাণ:</span>
+                    <div className="inline-flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-2xs">
                       <button
                         type="button"
                         onClick={() => setDetailQuantity(prev => Math.max(1, prev - 1))}
-                        className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold transition cursor-pointer"
+                        className="w-9 h-9 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition cursor-pointer"
                         aria-label="Decrease quantity"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-5 py-2 text-sm font-bold text-slate-900 min-w-[2.5rem] text-center">
+                      <span className="w-12 h-9 flex items-center justify-center text-sm font-bold text-slate-900 border-x border-slate-200">
                         {detailQuantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => setDetailQuantity(prev => prev + 1)}
-                        className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold transition cursor-pointer"
+                        className="w-9 h-9 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition cursor-pointer"
                         aria-label="Increase quantity"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    <span className="text-xs text-slate-500 font-medium">
+                      Total: <strong className="text-slate-900 font-bold">{formatPrice(effectivePrice * detailQuantity)}</strong>
+                    </span>
                   </div>
-
-                  {/* Multi-Vendor Store Card / Shop Attribution (Matching Screenshot 4) */}
-                  {(() => {
-                    const shopName = (activeProductDetail as any).vendorName || 'Ettadi Mart Store';
-                    const shopSlug = (activeProductDetail as any).vendorId ? (activeProductDetail as any).vendorId.replace('vendor-', '') : 'ettadi-mart';
-                    return (
-                      <div className="relative rounded-2xl overflow-hidden border border-slate-200/90 shadow-md group mt-3">
-                        <div className="h-32 w-full bg-slate-900 relative">
-                          <img 
-                            src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=300&fit=crop" 
-                            alt={shopName} 
-                            className="w-full h-full object-cover brightness-75 group-hover:scale-105 transition-transform duration-500" 
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                          <div className="absolute inset-x-4 bottom-3 flex items-center justify-between z-10">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-white font-extrabold text-sm sm:text-base drop-shadow-sm">
-                                  {shopName}
-                                </span>
-                                <span className="bg-emerald-500/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                                  Shop
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-white/80 mt-0.5">
-                                <span className="text-amber-400 font-bold">★ 5.0</span>
-                                <span>•</span>
-                                <span>Sold: -/24</span>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/shops/${shopSlug}`)}
-                              className="px-3 py-1.5 bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1"
-                            >
-                              <span>Visit Store</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
 
                   {/* Action Buttons: Add to Cart & Buy Now */}
                   <div className="space-y-3 pt-2">
@@ -2429,7 +2511,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                         onClick={() => {
                           handleAddToCart(activeProductDetail, detailQuantity, currentVariant || undefined);
                         }}
-                        className="w-full bg-orange-50 hover:bg-orange-100 border border-orange-200 active:scale-[0.99] text-[#F37022] font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full bg-orange-50 hover:bg-orange-100/90 border-2 border-[#F37022] active:scale-[0.99] text-[#F37022] font-bold py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2"
                       >
                         <ShoppingBag className="w-5 h-5 text-[#F37022]" />
                         <span>Add to Cart</span>
@@ -2442,61 +2524,99 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                           setIsCartOpen(false);
                           navigateTo('checkout');
                         }}
-                        className="w-full bg-[#F37022] hover:bg-[#d95c10] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-[6px] text-sm sm:text-base tracking-wide transition-all shadow-md shadow-orange-500/25 cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-[#F37022] to-[#ff5722] hover:from-[#d95c10] hover:to-[#e64a19] active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-md shadow-orange-500/25 cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <span>Buy Now</span>
+                        <Zap className="w-5 h-5 fill-current" />
+                        <span>Buy Now / অর্ডার করুন</span>
                       </button>
                     </div>
 
-                    {/* Button 2: Order on WhatsApp (Solid Green Full Width with Real WhatsApp Icon) */}
+                    {/* WhatsApp Order Button */}
                     <a
                       href={`https://wa.me/${whatsappNum}?text=${whatsappOrderMessage}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-full bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2.5"
+                      className="w-full bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl text-sm sm:text-base tracking-wide transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2.5"
                     >
                       <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                       </svg>
-                      <span>Order on WhatsApp</span>
+                      <span>Order on WhatsApp (হোয়াটসঅ্যাপে অর্ডার)</span>
                     </a>
                   </div>
 
-                  {/* Authentic Guarantee Badge (Generous Padding & Safe Line-Height for Bengali Glyphs) */}
-                  <div className="py-3 px-3.5 sm:py-3.5 sm:px-4 bg-orange-50/80 rounded-xl border border-orange-200/90 flex items-start gap-3">
-                    <ShieldCheck className="w-5 h-5 text-[#F37022] shrink-0 mt-0.5" />
-                    <p className="text-xs sm:text-[13px] text-slate-800 font-medium leading-relaxed m-0">
-                      ১০০% অরিজিনাল কোয়ালিটি ও ফাস্ট ডেলিভারির নিশ্চয়তা। সারা দেশে ক্যাশ অন ডেলিভারি সুবিধা।
-                    </p>
+                  {/* Clean Trust & Service Highlights Grid */}
+                  <div className="grid grid-cols-2 gap-2.5 pt-1">
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="w-8 h-8 rounded-lg bg-orange-100/80 text-[#F37022] flex items-center justify-center shrink-0">
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 leading-tight">Cash on Delivery</p>
+                        <p className="text-[11px] text-slate-500 leading-tight truncate">পণ্য দেখে মূল্য পরিশোধ</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 leading-tight">100% Authentic</p>
+                        <p className="text-[11px] text-slate-500 leading-tight truncate">সরাসরি চায়না ফ্যাক্টরি</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="w-8 h-8 rounded-lg bg-sky-100/80 text-sky-600 flex items-center justify-center shrink-0">
+                        <RefreshCw className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 leading-tight">7 Days Return</p>
+                        <p className="text-[11px] text-slate-500 leading-tight truncate">সহজ রিটার্ন ও রিপ্লেসমেন্ট</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100/80 text-amber-600 flex items-center justify-center shrink-0">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 leading-tight">Fast Dispatch</p>
+                        <p className="text-[11px] text-slate-500 leading-tight truncate">সারাদেশে দ্রুত ডেলিভারি</p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Single Clean Professional Product Description (Zero Duplication) */}
-                  <div className="bg-white rounded-[6px] border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
-                      <div className="w-7 h-7 rounded-[6px] bg-[#F37022]/10 text-[#F37022] flex items-center justify-center shrink-0">
+                  <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden mt-2">
+                    <div className="bg-slate-50/80 px-4 sm:px-5 py-3 border-b border-slate-200/80 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-[#F37022]/10 text-[#F37022] flex items-center justify-center shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
                       <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                        Product Description / পণ্যের বিবরণ
+                        Product Details / পণ্যের বিবরণ
                       </h2>
                     </div>
 
-                    <div className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal whitespace-pre-line text-justify">
-                      {cleanDescription}
-                    </div>
-
-                    {/* Genuine Usage Instructions (Rendered ONLY if completely distinct) */}
-                    {distinctHowToUse && (
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <h3 className="text-xs font-bold text-slate-900 mb-1 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#F37022]"></span>
-                          <span>ব্যবহার বিধি / How to Use</span>
-                        </h3>
-                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line text-justify">
-                          {distinctHowToUse}
-                        </p>
+                    <div className="p-4 sm:p-5 space-y-3.5">
+                      <div className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal whitespace-pre-line text-justify">
+                        {cleanDescription}
                       </div>
-                    )}
+
+                      {/* Genuine Usage Instructions (Rendered ONLY if completely distinct) */}
+                      {distinctHowToUse && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <h3 className="text-xs font-bold text-slate-900 mb-1.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#F37022]"></span>
+                            <span>ব্যবহার বিধি / How to Use</span>
+                          </h3>
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line text-justify">
+                            {distinctHowToUse}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                 </div>
@@ -2630,8 +2750,7 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                     const discountPct = item.originalPrice && item.originalPrice > item.price
                       ? Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)
                       : null;
-                    const rating = (4.8 + ((item.id.charCodeAt(0) % 3) * 0.1)).toFixed(1);
-                    const reviewCount = 20 + (item.id.charCodeAt(item.id.length - 1) % 300);
+                    const isFreeDelivery = item.deliveryChargeEnabled === false || (item as any).freeDelivery === true;
 
                     return (
                       <div
@@ -2639,48 +2758,27 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                         className="w-[195px] sm:w-[215px] md:w-[230px] shrink-0 bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
                       >
                         <div>
-                          {/* Promo Ribbon */}
-                          <div className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white font-black text-[10px] sm:text-[11px] px-2 py-1 flex items-center justify-center gap-1 uppercase tracking-tight shadow-xs">
-                            <span>⚡ BUY ANY 3 GET FREE DELIVERY</span>
-                          </div>
-
-                          {/* Image */}
+                          {/* Image - Full Width Edge-to-Edge */}
                           <div 
                             onClick={() => {
                               openProductDetail(item);
                               scrollToTop();
                             }}
-                            className="relative aspect-square w-full bg-slate-50 overflow-hidden cursor-pointer flex items-center justify-center p-3"
+                            className="relative aspect-square w-full bg-slate-50 overflow-hidden cursor-pointer flex items-center justify-center select-none"
                           >
                             <img
                               src={item.coverImage || item.image || DEFAULT_FANTINE_FALLBACK_IMAGE}
                               alt={item.title}
-                              className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
                                 e.currentTarget.src = DEFAULT_FANTINE_FALLBACK_IMAGE;
                               }}
                             />
-
-                            <div className="absolute bottom-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-xs">
-                              <span>{rating}</span>
-                              <Star className="w-2.5 h-2.5 fill-current" />
-                              <span className="opacity-90">{reviewCount}</span>
-                            </div>
                           </div>
 
                           {/* Info */}
                           <div className="p-3">
-                            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                              <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded tracking-wide">
-                                FAST
-                              </span>
-                              <span className="bg-[#1e3a8a] text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                <span>Verified</span>
-                              </span>
-                            </div>
-
                             <h4 
                               onClick={() => {
                                 openProductDetail(item);
@@ -2707,9 +2805,11 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                               </span>
                             </div>
 
-                            <div className="mt-0.5 text-[10px] text-emerald-700 font-semibold">
-                              FREE delivery
-                            </div>
+                            {isFreeDelivery && (
+                              <div className="mt-1 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                                <span>Free delivery</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -3485,121 +3585,6 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                       </div>
                     </div>
                   ) : null}
-
-                  {/* Posh Website Marquee Ticker */}
-                  <div className="mt-4 sm:mt-5 bg-white rounded-[6px] border border-slate-100 shadow-2xs py-2.5 sm:py-3 px-3 sm:px-4 overflow-hidden flex items-center select-none">
-                    {/* Scrolling Ticker Track */}
-                    <div className="flex-1 overflow-hidden relative">
-                      <div className="animate-marquee items-center gap-8 text-xs sm:text-[13px] text-slate-700 font-medium">
-                        {/* Set 1 */}
-                        <span className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">ETTADI MART:</span>
-                          <span>China Direct Import Varieties, Gadgets & Lifestyle Products at Unbeatable Prices.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
-                          <span className="font-semibold text-slate-800">100% Quality Checked</span>
-                          <span>& Authentic Guaranteed.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Truck className="w-4 h-4 text-blue-600 inline" />
-                          <span>Fast Cash on Delivery (COD) Available Nationwide Across Bangladesh.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5 text-[#F37022] font-bold">
-                          <Tag className="w-3.5 h-3.5 inline" />
-                          <span>Special Promo: Buy Any 3 Products & Get Free Delivery!</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-600 inline" />
-                          <span>Customer Care Hotline: +8809613444455 (9 AM – 9 PM Everyday)</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <span>⭐ 10,000+ Happy Customers Trust Ettadi Mart</span>
-                        </span>
-                        <span className="text-slate-300 mr-8">•</span>
-
-                        {/* Set 2 (Duplicate for smooth infinite scroll) */}
-                        <span className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">ETTADI MART:</span>
-                          <span>China Direct Import Varieties, Gadgets & Lifestyle Products at Unbeatable Prices.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
-                          <span className="font-semibold text-slate-800">100% Quality Checked</span>
-                          <span>& Authentic Guaranteed.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Truck className="w-4 h-4 text-blue-600 inline" />
-                          <span>Fast Cash on Delivery (COD) Available Nationwide Across Bangladesh.</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5 text-[#F37022] font-bold">
-                          <Tag className="w-3.5 h-3.5 inline" />
-                          <span>Special Promo: Buy Any 3 Products & Get Free Delivery!</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-600 inline" />
-                          <span>Customer Care Hotline: +8809613444455 (9 AM – 9 PM Everyday)</span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1.5">
-                          <span>⭐ 10,000+ Happy Customers Trust Ettadi Mart</span>
-                        </span>
-                        <span className="text-slate-300 mr-8">•</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cartup-Style 4-Item Value Proposition Features Grid */}
-                  <div className="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
-                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-orange-50 text-[#F37022] flex items-center justify-center shrink-0">
-                        <Truck className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">সারা দেশে ক্যাশ অন ডেলিভারি</h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">পণ্য হাতে পেয়ে চেক করে পেমেন্ট</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
-                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">১০০% কোয়ালিটি নিশ্চিত</h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">সরাসরি চায়না ফ্যাক্টরি থেকে আমদানিকৃত</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
-                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                        <CreditCard className="w-5 h-5 stroke-[2.2]" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">সবচেয়ে সাশ্রয়ী মূল্য</h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">পাইকারি ও খুচরা মূল্যে গ্যাজেটস</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100 shadow-2xs hover:shadow-xs hover:border-orange-200 transition-all flex items-center gap-2.5 sm:gap-3.5">
-                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                        <Zap className="w-5 h-5 stroke-[2.2] fill-amber-500" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">৭ দিনের সহজ রিটার্ন</h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">সমস্যা হলে দ্রুত রিপ্লেসমেন্ট সুবিধা</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </section>
             );
@@ -3714,18 +3699,105 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                     ))}
                   </div>
                 </>
+              ) : categoryProductSections.length > 0 ? (
+                <div className="space-y-12 sm:space-y-16">
+                  {categoryProductSections.map((section, idx) => {
+                    const paintGradient = PAINT_PALETTES[idx % PAINT_PALETTES.length];
+                    return (
+                      <div key={section.slug} className="space-y-4 sm:space-y-5">
+                        {/* Category Header with Paint-stroke Highlight */}
+                        <div className="flex items-center justify-between gap-4 pb-2 border-b border-slate-100">
+                          {/* Paint highlight category name */}
+                          <div className="relative inline-flex items-center group/cat my-1">
+                            {/* Paint / Highlighter stroke effect */}
+                            <span
+                              aria-hidden="true"
+                              className={`absolute -inset-x-2.5 -inset-y-1 bg-gradient-to-r ${paintGradient} -rotate-1 rounded-sm transform -skew-x-6 z-0 shadow-2xs opacity-90 group-hover/cat:scale-105 transition-transform duration-200`}
+                            />
+                            <h2 className="relative z-10 text-lg sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#F37022] shrink-0" />
+                              <span>{section.category}</span>
+                            </h2>
+                          </div>
+
+                          {/* Controls: Left/Right Carousel Scroll Arrows + See All Link */}
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-1 sm:gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleScrollCategoryTrack(section.slug, 'left')}
+                                className="w-8 h-8 rounded-full border border-slate-200/90 bg-white hover:bg-orange-50 hover:border-orange-300 text-slate-700 hover:text-[#F37022] flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                title="Scroll left"
+                                aria-label={`Scroll ${section.category} left`}
+                              >
+                                <ChevronLeft className="w-4 h-4 stroke-[2.2]" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleScrollCategoryTrack(section.slug, 'right')}
+                                className="w-8 h-8 rounded-full border border-slate-200/90 bg-white hover:bg-orange-50 hover:border-orange-300 text-slate-700 hover:text-[#F37022] flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                title="Scroll right"
+                                aria-label={`Scroll ${section.category} right`}
+                              >
+                                <ChevronRight className="w-4 h-4 stroke-[2.2]" />
+                              </button>
+                            </div>
+
+                            <a
+                              href={`/category/${encodeURIComponent(section.slug)}`}
+                              onClick={(e) => {
+                                if (!e.metaKey && !e.ctrlKey && e.button === 0 && !e.shiftKey) {
+                                  e.preventDefault();
+                                  setSelectedCategoryCheckbox(section.category);
+                                  setSelectedSubCategory('All');
+                                  setCurrentPage(1);
+                                  navigate(`/category/${encodeURIComponent(section.slug)}`);
+                                  scrollToTop();
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-bold text-[#F37022] hover:text-[#d95c10] px-2 sm:px-2.5 py-1 rounded-[6px] hover:bg-orange-50 transition-colors group cursor-pointer"
+                              title={`View all ${section.category} products`}
+                            >
+                              <span>See All</span>
+                              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform group-hover:translate-x-1" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Horizontal Carousel Slider (Max 15 Products) */}
+                        <div
+                          id={`cat-carousel-track-${section.slug}`}
+                          className="flex items-stretch gap-3.5 sm:gap-5 overflow-x-auto scrollbar-none scroll-smooth pb-3 pt-1 -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+                        >
+                          {section.products.slice(0, 15).map((product) => (
+                            <div
+                              key={product.id}
+                              className="w-[195px] sm:w-[225px] md:w-[245px] shrink-0 flex flex-col"
+                            >
+                              <EttadiProductCard
+                                product={product}
+                                displayStoreLogo={displayStoreIcon}
+                                onOpenDetail={openProductDetail}
+                                onAddToCart={handleAddToCart}
+                                onBuyNow={(prod, variant) => {
+                                  handleAddToCart(prod, 1, variant);
+                                  setIsCartOpen(false);
+                                  navigateTo('checkout');
+                                }}
+                                formatPrice={formatPrice}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : products.length > 0 ? (
                 <>
-                  {/* Section Header */}
-                  <div className="mb-6">
-                    <h2 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
-                      Deals you can't miss
-                    </h2>
-                  </div>
-
-                  {/* Products Grid with Wider, Clean Product Cards */}
+                  {/* Fallback Single Grid if products have no categorized items */}
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                    {products.slice(0, 12).map((product) => (
+                    {products.slice(0, 15).map((product) => (
                       <EttadiProductCard
                         key={product.id}
                         product={product}
@@ -3742,7 +3814,6 @@ export default function EttadiStorePage({ onGoToLogin, onGoToLanding }: EttadiSt
                     ))}
                   </div>
 
-                  {/* "Load More" Button */}
                   <div className="flex items-center justify-center mt-8 sm:mt-10">
                     <button 
                       onClick={() => navigateTo('shop')}

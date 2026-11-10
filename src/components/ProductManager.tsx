@@ -88,7 +88,8 @@ export default function ProductManager({
   const [minOrderQty, setMinOrderQty] = useState<number | ''>(1);
   const [selectedAttributesState, setSelectedAttributesState] = useState<Record<string, string[]>>({});
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
-  const [selectedCategoriesList, setSelectedCategoriesList] = useState<string[]>([]);
+  const [selectedParentCategories, setSelectedParentCategories] = useState<string[]>([]);
+  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
   const [vendorId, setVendorId] = useState('');
   const [vendorName, setVendorName] = useState('');
@@ -143,16 +144,31 @@ export default function ProductManager({
           dbService.getUnits(),
           dbService.getCategories()
         ]);
-        let loadedCats: CategoryItem[] = categoriesData && categoriesData.length > 0 ? categoriesData : (settings.categoryItems || []);
-        if (settings.categoryItems && settings.categoryItems.length > 0) {
-          loadedCats = settings.categoryItems;
-        } else if (settings.categories && settings.categories.length > 0) {
-          loadedCats = settings.categories.map((c, idx) => ({
+
+        // Prioritize live database categories, and merge any non-duplicate settings categories
+        let loadedCats: CategoryItem[] = [];
+        if (Array.isArray(categoriesData) && categoriesData.length > 0) {
+          loadedCats = [...categoriesData];
+          const existingNames = new Set(categoriesData.map(c => c.name.trim().toLowerCase()));
+          if (Array.isArray(settings?.categoryItems)) {
+            for (const item of settings.categoryItems) {
+              if (item && item.name && !existingNames.has(item.name.trim().toLowerCase())) {
+                loadedCats.push(item);
+                existingNames.add(item.name.trim().toLowerCase());
+              }
+            }
+          }
+        } else if (Array.isArray(settings?.categoryItems) && settings.categoryItems.length > 0) {
+          loadedCats = [...settings.categoryItems];
+        } else if (Array.isArray(settings?.categories) && settings.categories.length > 0) {
+          loadedCats = settings.categories.map((c: any, idx: number) => ({
             id: `cat-${idx}`,
-            name: c,
+            name: typeof c === 'string' ? c : c.name,
+            parentId: null,
             subcategories: []
           }));
         }
+
         setStoreCategories(loadedCats);
         setStoreBrands(brandsData || []);
         setStoreVendors(vendorsData || []);
@@ -169,10 +185,12 @@ export default function ProductManager({
     window.addEventListener('ecom-settings-updated', loadData);
     window.addEventListener('brands-updated', loadData);
     window.addEventListener('attributes-updated', loadData);
+    window.addEventListener('categories-updated', loadData);
     return () => {
       window.removeEventListener('ecom-settings-updated', loadData);
       window.removeEventListener('brands-updated', loadData);
       window.removeEventListener('attributes-updated', loadData);
+      window.removeEventListener('categories-updated', loadData);
     };
   }, []);
 
@@ -227,8 +245,8 @@ export default function ProductManager({
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const categories = useMemo(() => {
-    const adminCatNames = storeCategories.map(c => c.name);
-    return ['all', ...adminCatNames];
+    const rootCats = storeCategories.filter(c => !c.parentId).map(c => c.name);
+    return ['all', ...Array.from(new Set(rootCats))];
   }, [storeCategories]);
 
   const handleOpenModal = (product?: Product) => {
@@ -262,9 +280,38 @@ export default function ProductManager({
       setShortSummary(existingDesc);
       setDescription(existingDesc);
       setSubtitle(product.subtitle || '');
-      setCategory(product.category || 'Vegetables');
-      setSubCategory(product.subCategory || '');
-      setSelectedCategoriesList(product.category ? [product.category, ...(product.subCategory ? [product.subCategory] : [])] : ['Vegetables']);
+      
+      // Multi-category support
+      const loadedParentCats: string[] = [];
+      if (Array.isArray((product as any).categories) && (product as any).categories.length > 0) {
+        (product as any).categories.forEach((c: any) => {
+          const trimmed = String(c).trim();
+          if (trimmed && !loadedParentCats.includes(trimmed)) loadedParentCats.push(trimmed);
+        });
+      } else if (product.category) {
+        product.category.split(',').forEach(c => {
+          const trimmed = c.trim();
+          if (trimmed && !loadedParentCats.includes(trimmed)) loadedParentCats.push(trimmed);
+        });
+      }
+      setSelectedParentCategories(loadedParentCats);
+      setCategory(loadedParentCats[0] || product.category || '');
+
+      const loadedSubCats: string[] = [];
+      if (Array.isArray((product as any).subCategories) && (product as any).subCategories.length > 0) {
+        (product as any).subCategories.forEach((s: any) => {
+          const trimmed = String(s).trim();
+          if (trimmed && !loadedSubCats.includes(trimmed)) loadedSubCats.push(trimmed);
+        });
+      } else if (product.subCategory) {
+        product.subCategory.split(',').forEach(s => {
+          const trimmed = s.trim();
+          if (trimmed && !loadedSubCats.includes(trimmed)) loadedSubCats.push(trimmed);
+        });
+      }
+      setSelectedSubCategories(loadedSubCats);
+      setSubCategory(loadedSubCats[0] || product.subCategory || '');
+
       setUnit(product.unit || 'kg');
       setMinOrderQty(product.minOrderQty ?? 1);
       setSelectedAttributesState((product as any).selectedAttributes ? (typeof (product as any).selectedAttributes === 'string' ? JSON.parse((product as any).selectedAttributes) : (product as any).selectedAttributes) : {});
@@ -336,7 +383,9 @@ export default function ProductManager({
       setShortSummary('');
       setDescription('');
       setSubtitle('');
-      setCategory(storeCategories[0]?.name || '');
+      setSelectedParentCategories([]);
+      setSelectedSubCategories([]);
+      setCategory('');
       setSubCategory('');
       setBrand('');
       setSlug('');
@@ -569,8 +618,10 @@ export default function ProductManager({
       costPrice: Number(costPrice) || 0,
       vatPercent: Number(vatPercent) || 0,
       image: image.trim() || 'https://images.unsplash.com/photo-1608248597359-0098f98a329d?w=800&auto=format&fit=crop&q=85',
-      category: (selectedCategoriesList[0] || category).trim() || 'Vegetables',
-      subCategory: (selectedCategoriesList[1] || subCategory).trim(),
+      category: (selectedParentCategories.length > 0 ? selectedParentCategories.join(', ') : category).trim() || 'General',
+      subCategory: (selectedSubCategories.length > 0 ? selectedSubCategories.join(', ') : subCategory).trim(),
+      categories: selectedParentCategories.length > 0 ? selectedParentCategories : [category || 'General'],
+      subCategories: selectedSubCategories,
       brand: brand.trim() || undefined,
       unit: unit || 'kg',
       minOrderQty: isWholesaleAvailable && wholesaleMinOrderQty !== '' ? Number(wholesaleMinOrderQty) : (minOrderQty !== '' ? Number(minOrderQty) : 1),
@@ -699,7 +750,14 @@ export default function ProductManager({
         (p.subCategory && p.subCategory.toLowerCase().includes(term)) ||
         (p.slug && p.slug.toLowerCase().includes(term)) ||
         (p.seoKeywords && p.seoKeywords.some(keyword => keyword.toLowerCase().includes(term)));
-      const matchesCat = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchesCat = selectedCategory === 'all' || (() => {
+        const sel = selectedCategory.toLowerCase();
+        const cats = [
+          ...(Array.isArray((p as any).categories) ? (p as any).categories : []),
+          ...(p.category ? p.category.split(',') : [])
+        ].map(c => String(c).trim().toLowerCase());
+        return cats.includes(sel) || (p.category && p.category.toLowerCase().includes(sel));
+      })();
       const matchesBrand = selectedBrandFilter === 'all' || p.brand === selectedBrandFilter;
       return matchesSearch && matchesCat && matchesBrand;
     });
@@ -1305,11 +1363,15 @@ export default function ProductManager({
             >
               <Layers className="w-4 h-4 text-emerald-600" />
               <span>Category & Hierarchy</span>
-              {category && (
+              {selectedParentCategories.length > 0 ? (
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md max-w-[140px] truncate">
+                  {selectedParentCategories.length} selected
+                </span>
+              ) : category ? (
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md max-w-[100px] truncate">
                   {category}
                 </span>
-              )}
+              ) : null}
             </button>
 
             <button
@@ -1777,9 +1839,15 @@ export default function ProductManager({
                             className="p-3 bg-slate-50 hover:bg-emerald-50/50 rounded-xl border border-slate-200 cursor-pointer transition-all flex items-center justify-between"
                           >
                             <div>
-                              <span className="text-[10px] text-slate-400 font-bold uppercase block">Category</span>
-                              <span className="font-bold text-slate-800 text-xs">{category || 'Not Selected'}</span>
-                              {subCategory && <span className="text-[11px] text-emerald-600 block">↳ {subCategory}</span>}
+                              <span className="text-[10px] text-slate-400 font-bold uppercase block">Categories</span>
+                              <span className="font-bold text-slate-800 text-xs">
+                                {selectedParentCategories.length > 0 ? selectedParentCategories.join(', ') : (category || 'Not Selected')}
+                              </span>
+                              {selectedSubCategories.length > 0 ? (
+                                <span className="text-[11px] text-emerald-600 block">↳ {selectedSubCategories.join(', ')}</span>
+                              ) : subCategory ? (
+                                <span className="text-[11px] text-emerald-600 block">↳ {subCategory}</span>
+                              ) : null}
                             </div>
                             <ArrowRight className="w-4 h-4 text-slate-400" />
                           </div>
@@ -1813,17 +1881,116 @@ export default function ProductManager({
                             <Layers className="w-5 h-5" />
                           </div>
                           <div>
-                            <h4 className="text-base font-bold text-slate-900">Category & Subcategory</h4>
+                            <h4 className="text-base font-bold text-slate-900">Category & Hierarchy</h4>
                             <p className="text-xs text-slate-500">
-                              Select the primary category and subcategory for this product
+                              Pick one or more categories and subcategories for this product (multi-category enabled)
                             </p>
                           </div>
                         </div>
 
-                        {category && (
-                          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                            <span className="text-xs text-emerald-800 font-bold">Current: {category}</span>
-                            {subCategory && <span className="text-xs text-emerald-600 font-medium">({subCategory})</span>}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const name = window.prompt('Enter new category name:');
+                              if (name?.trim()) {
+                                dbService.saveCategory({ name: name.trim() }).then(newCat => {
+                                  setStoreCategories(prev => [...prev, newCat]);
+                                  setSelectedParentCategories(prev => [...prev, newCat.name]);
+                                  if (!category) setCategory(newCat.name);
+                                });
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add New Category</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Selected Categories & Subcategories Summary Bar */}
+                      <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                            <Check className="w-4 h-4 text-emerald-600" />
+                            <span>Categories Selected ({selectedParentCategories.length}):</span>
+                          </span>
+
+                          {selectedParentCategories.length === 0 ? (
+                            <span className="text-xs text-slate-500 italic">No category selected yet. Please check one or more below.</span>
+                          ) : (
+                            selectedParentCategories.map((catName, idx) => (
+                              <span
+                                key={catName}
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border shadow-2xs ${
+                                  idx === 0
+                                    ? 'bg-emerald-600 text-white border-emerald-700'
+                                    : 'bg-white text-emerald-900 border-emerald-300'
+                                }`}
+                              >
+                                <span>{catName}</span>
+                                {idx === 0 && <span className="text-[10px] bg-white/25 px-1 py-0.2 rounded font-medium">Primary</span>}
+                                {idx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      // Make primary
+                                      setSelectedParentCategories(prev => [catName, ...prev.filter(c => c !== catName)]);
+                                      setCategory(catName);
+                                    }}
+                                    className="text-[10px] text-emerald-600 hover:underline cursor-pointer ml-0.5"
+                                    title="Set as primary category"
+                                  >
+                                    Make Primary
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedParentCategories(prev => prev.filter(c => c !== catName));
+                                    if (category === catName) {
+                                      const remaining = selectedParentCategories.filter(c => c !== catName);
+                                      setCategory(remaining[0] || '');
+                                    }
+                                  }}
+                                  className="hover:opacity-70 cursor-pointer ml-1"
+                                  title="Remove category"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            ))
+                          )}
+                        </div>
+
+                        {selectedSubCategories.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-200/60">
+                            <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider shrink-0">
+                              Subcategories ({selectedSubCategories.length}):
+                            </span>
+                            {selectedSubCategories.map(subName => (
+                              <span
+                                key={subName}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white text-slate-800 border border-slate-300 px-2 py-0.5 rounded-md shadow-2xs"
+                              >
+                                <span>{subName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSubCategories(prev => prev.filter(s => s !== subName));
+                                    if (subCategory === subName) {
+                                      const remaining = selectedSubCategories.filter(s => s !== subName);
+                                      setSubCategory(remaining[0] || '');
+                                    }
+                                  }}
+                                  className="text-slate-400 hover:text-rose-600 cursor-pointer ml-1"
+                                  title="Remove subcategory"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1844,101 +2011,139 @@ export default function ProductManager({
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                         {storeCategories
                           .filter(c => !c.parentId)
+                          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
                           .filter(c => 
                             c.name.toLowerCase().includes(categorySearchTerm.toLowerCase()) || 
                             storeCategories.some(sub => sub.parentId === c.id && sub.name.toLowerCase().includes(categorySearchTerm.toLowerCase()))
                           )
                           .map((parent) => {
-                            const isParentSelected = selectedCategoriesList.includes(parent.name) || category === parent.name;
-                            const childCats = storeCategories.filter(sub => sub.parentId === parent.id);
+                            const isParentSelected = selectedParentCategories.includes(parent.name);
+                            const childCats = storeCategories
+                              .filter(sub => sub.parentId === parent.id)
+                              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
                             return (
                               <div 
                                 key={parent.id} 
-                                className={`p-4 rounded-2xl border transition-all ${
+                                className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
                                   isParentSelected 
-                                    ? 'bg-emerald-50/50 border-emerald-300 shadow-xs' 
+                                    ? 'bg-emerald-50/50 border-emerald-300 shadow-xs ring-1 ring-emerald-200' 
                                     : 'bg-slate-50/40 border-slate-200 hover:border-slate-300 hover:bg-white'
                                 }`}
                               >
-                                <label className="flex items-center gap-3 cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={isParentSelected}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedCategoriesList(prev => [...prev.filter(n => n !== parent.name), parent.name]);
-                                        setCategory(parent.name);
-                                      } else {
-                                        setSelectedCategoriesList(prev => prev.filter(name => name !== parent.name));
-                                        if (category === parent.name) setCategory('');
-                                      }
-                                    }}
-                                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                                  />
-                                  <span className={`text-sm font-bold ${isParentSelected ? 'text-emerald-900' : 'text-slate-800'}`}>
-                                    {parent.name}
-                                  </span>
-                                </label>
+                                <div>
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <label className="flex items-center gap-3 cursor-pointer select-none flex-1 min-w-0">
+                                      <input
+                                        type="checkbox"
+                                        checked={isParentSelected}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedParentCategories(prev => [...prev.filter(n => n !== parent.name), parent.name]);
+                                            if (!category) setCategory(parent.name);
+                                          } else {
+                                            setSelectedParentCategories(prev => prev.filter(name => name !== parent.name));
+                                            if (category === parent.name) {
+                                              const remaining = selectedParentCategories.filter(name => name !== parent.name);
+                                              setCategory(remaining[0] || '');
+                                            }
+                                          }
+                                        }}
+                                        className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                      />
+                                      <span className={`text-sm font-bold truncate ${isParentSelected ? 'text-emerald-950 font-black' : 'text-slate-800'}`}>
+                                        {parent.name}
+                                      </span>
+                                    </label>
 
-                                {childCats.length > 0 && (
-                                  <div className="mt-3 pl-4 space-y-2 border-l-2 border-slate-200/80 ml-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Subcategories:</span>
-                                    {childCats.map(child => {
-                                      const isChildChecked = selectedCategoriesList.includes(child.name) || subCategory === child.name;
-                                      return (
-                                        <label key={child.id} className="flex items-center gap-2.5 cursor-pointer select-none text-xs">
-                                          <input
-                                            type="checkbox"
-                                            checked={isChildChecked}
-                                            onChange={(e) => {
-                                              if (e.target.checked) {
-                                                setSelectedCategoriesList(prev => [...prev.filter(n => n !== child.name), child.name]);
-                                                setSubCategory(child.name);
-                                                // Ensure parent is also selected
-                                                if (!category) setCategory(parent.name);
-                                                if (!selectedCategoriesList.includes(parent.name)) {
-                                                  setSelectedCategoriesList(prev => [...prev, parent.name]);
-                                                }
+                                    {/* Quick add subcategory under this category */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const subName = window.prompt(`Enter new subcategory for ${parent.name}:`);
+                                        if (subName?.trim()) {
+                                          dbService.saveCategory({ name: subName.trim(), parentId: parent.id }).then(newSub => {
+                                            setStoreCategories(prev => [...prev, newSub]);
+                                            setSelectedSubCategories(prev => [...prev, newSub.name]);
+                                            if (!selectedParentCategories.includes(parent.name)) {
+                                              setSelectedParentCategories(prev => [...prev, parent.name]);
+                                            }
+                                          });
+                                        }
+                                      }}
+                                      className="text-[10px] font-bold text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 px-2 py-0.5 rounded-md transition-colors cursor-pointer shrink-0"
+                                      title={`Add subcategory to ${parent.name}`}
+                                    >
+                                      + Sub
+                                    </button>
+                                  </div>
+
+                                  {childCats.length > 0 && (
+                                    <div className="mt-3 pl-3 space-y-2 border-l-2 border-emerald-200/80 ml-2">
+                                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        <span>Subcategories ({childCats.length}):</span>
+                                        {childCats.length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const allChildNames = childCats.map(c => c.name);
+                                              const areAllChecked = allChildNames.every(name => selectedSubCategories.includes(name));
+                                              if (areAllChecked) {
+                                                setSelectedSubCategories(prev => prev.filter(name => !allChildNames.includes(name)));
                                               } else {
-                                                setSelectedCategoriesList(prev => prev.filter(name => name !== child.name));
-                                                if (subCategory === child.name) setSubCategory('');
+                                                setSelectedSubCategories(prev => Array.from(new Set([...prev, ...allChildNames])));
+                                                if (!selectedParentCategories.includes(parent.name)) {
+                                                  setSelectedParentCategories(prev => [...prev, parent.name]);
+                                                }
                                               }
                                             }}
-                                            className="w-3.5 h-3.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                                          />
-                                          <span className={isChildChecked ? 'text-emerald-800 font-bold' : 'text-slate-600'}>
-                                            {child.name}
-                                          </span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                                            className="text-emerald-600 hover:underline normal-case font-semibold"
+                                          >
+                                            {childCats.every(c => selectedSubCategories.includes(c.name)) ? 'Clear' : 'Select all'}
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <div className="space-y-1.5 pt-1">
+                                        {childCats.map(child => {
+                                          const isChildChecked = selectedSubCategories.includes(child.name);
+                                          return (
+                                            <label key={child.id} className="flex items-center gap-2.5 cursor-pointer select-none text-xs">
+                                              <input
+                                                type="checkbox"
+                                                checked={isChildChecked}
+                                                onChange={(e) => {
+                                                  if (e.target.checked) {
+                                                    setSelectedSubCategories(prev => [...prev.filter(n => n !== child.name), child.name]);
+                                                    if (!subCategory) setSubCategory(child.name);
+                                                    // Ensure parent is also selected
+                                                    if (!selectedParentCategories.includes(parent.name)) {
+                                                      setSelectedParentCategories(prev => [...prev, parent.name]);
+                                                      if (!category) setCategory(parent.name);
+                                                    }
+                                                  } else {
+                                                    setSelectedSubCategories(prev => prev.filter(name => name !== child.name));
+                                                    if (subCategory === child.name) {
+                                                      const remaining = selectedSubCategories.filter(name => name !== child.name);
+                                                      setSubCategory(remaining[0] || '');
+                                                    }
+                                                  }
+                                                }}
+                                                className="w-3.5 h-3.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                              />
+                                              <span className={isChildChecked ? 'text-emerald-900 font-bold' : 'text-slate-600'}>
+                                                {child.name}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
-                      </div>
-
-                      {/* Add New Category Quick Button */}
-                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const name = window.prompt('Enter new category name:');
-                            if (name?.trim()) {
-                              dbService.saveCategory({ name: name.trim() }).then(newCat => {
-                                setStoreCategories(prev => [...prev, newCat]);
-                                setSelectedCategoriesList(prev => [...prev, newCat.name]);
-                                setCategory(newCat.name);
-                              });
-                            }
-                          }}
-                          className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Add New Category</span>
-                        </button>
                       </div>
 
                     </div>

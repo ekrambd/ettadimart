@@ -44,9 +44,18 @@ function formatProduct(p: any) {
     ? extraMeta.additionalImages
     : samplePages;
 
+  const categories = Array.isArray(extraMeta.categories) && extraMeta.categories.length > 0
+    ? extraMeta.categories
+    : (p.category ? p.category.split(',').map((c: string) => c.trim()).filter(Boolean) : []);
+  const subCategories = Array.isArray(extraMeta.subCategories) && extraMeta.subCategories.length > 0
+    ? extraMeta.subCategories
+    : (p.subCategory ? p.subCategory.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+
   return {
     ...p,
     ...extraMeta,
+    categories,
+    subCategories,
     samplePages,
     additionalImages,
     images: samplePages,
@@ -164,6 +173,12 @@ function sanitizeProductForDb(data: any, isUpdate = false): Record<string, any> 
   if (data.isPrivate !== undefined) meta.isPrivate = Boolean(data.isPrivate);
   if (data.isOneTimePurchase !== undefined) meta.isOneTimePurchase = Boolean(data.isOneTimePurchase);
   if (data.weight !== undefined) meta.weight = toNum(data.weight);
+  if (data.categories !== undefined && Array.isArray(data.categories)) {
+    meta.categories = data.categories.filter((c: any) => typeof c === 'string' && c.trim());
+  }
+  if (data.subCategories !== undefined && Array.isArray(data.subCategories)) {
+    meta.subCategories = data.subCategories.filter((s: any) => typeof s === 'string' && s.trim());
+  }
   if (data.features !== undefined && Array.isArray(data.features) && data.features.length > 0) {
     meta.featuresList = data.features;
   }
@@ -231,10 +246,10 @@ productRouter.get('/', async (req, res) => {
       where.brand = brand;
     }
     if (category && typeof category === 'string' && category !== 'All') {
-      where.category = category;
+      where.category = { contains: category };
     }
     if (subCategory && typeof subCategory === 'string' && subCategory !== 'All') {
-      where.subCategory = subCategory;
+      where.subCategory = { contains: subCategory };
     }
 
     const products = await prisma.product.findMany({
