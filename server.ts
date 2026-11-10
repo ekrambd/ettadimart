@@ -7,6 +7,13 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
 
+// Global BigInt serialization patch for JSON responses
+if (typeof BigInt !== 'undefined' && !(BigInt.prototype as any).toJSON) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 import { createServer as createViteServer } from "vite";
 import { app } from "./src/server/app";
 import { prisma } from "./src/server/db";

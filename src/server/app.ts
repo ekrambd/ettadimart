@@ -36,6 +36,13 @@ import { circuitBreakerRegistry } from './services/circuitBreaker';
 import { backupEngine } from './services/backupEngine';
 import { telemetryService } from './services/telemetryService';
 
+// Global BigInt serialization patch so JSON.stringify / res.json never throws TypeError
+if (typeof BigInt !== 'undefined' && !(BigInt.prototype as any).toJSON) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 export const app = express();
 
 // Trust reverse proxies (Cloudflare & Nginx) for real client IP and HTTPS protocol detection

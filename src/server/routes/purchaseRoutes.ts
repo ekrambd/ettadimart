@@ -4,16 +4,26 @@ import { requireAdmin } from '../middleware/adminAuth';
 
 export const purchaseRouter = Router();
 
+// Helper to safely convert any BigInt in an object to Number
+function sanitizeBigInt<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  return JSON.parse(
+    JSON.stringify(data, (_, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    )
+  );
+}
+
 // GET /api/purchases
 purchaseRouter.get('/', async (_req, res) => {
   try {
     const list = await (prisma as any).$queryRawUnsafe(`
       SELECT p.*, 
-        (SELECT COUNT(*) FROM PurchaseItem WHERE purchaseId = p.id) as itemsCount
+        CAST((SELECT COUNT(*) FROM PurchaseItem WHERE purchaseId = p.id) AS INTEGER) as itemsCount
       FROM Purchase p
       ORDER BY p.createdAt DESC
     `);
-    res.json(list);
+    res.json(sanitizeBigInt(list || []));
   } catch (error) {
     console.error('Failed to fetch purchases:', error);
     res.status(500).json({ error: 'Failed to fetch purchases' });
@@ -36,7 +46,7 @@ purchaseRouter.get('/:id', async (req, res) => {
       SELECT * FROM PurchaseItem WHERE purchaseId = ?
     `, purchase.id);
 
-    res.json({ ...purchase, items });
+    res.json(sanitizeBigInt({ ...purchase, items: items || [] }));
   } catch (error) {
     console.error('Failed to fetch purchase details:', error);
     res.status(500).json({ error: 'Failed to fetch purchase details' });
@@ -188,7 +198,7 @@ purchaseRouter.get('/returns/list', async (_req, res) => {
     const list = await (prisma as any).$queryRawUnsafe(`
       SELECT * FROM PurchaseReturn ORDER BY createdAt DESC
     `);
-    res.json(list);
+    res.json(sanitizeBigInt(list || []));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch purchase returns' });
   }

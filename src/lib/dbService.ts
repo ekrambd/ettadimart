@@ -1851,10 +1851,10 @@ export const dbService = {
     } catch {}
 
     return getLocalData<ProductAttribute[]>('noor_attributes', [
-      { id: 'attr-1', name: 'Size', values: ['S', 'M', 'L', 'XL', 'XXL'], status: true },
-      { id: 'attr-2', name: 'Color', values: ['Red', 'Green', 'Blue', 'Black', 'White'], status: true },
-      { id: 'attr-3', name: 'Weight / Pack', values: ['250g', '500g', '1kg', '2kg', '5kg'], status: true },
-      { id: 'attr-4', name: 'Material', values: ['Cotton', 'Leather', 'Steel', 'Plastic'], status: true }
+      { id: 'attr-1', name: 'Pack Quantity', values: ['20', '50', '100', '200'], status: false },
+      { id: 'attr-2', name: 'Liquid Volume', values: ['50 ml', '100 ml', '250 ml', '500 ml'], status: false },
+      { id: 'attr-3', name: 'Weight / Pack', values: ['250g', '500g', '1kg', '2kg'], status: false },
+      { id: 'attr-4', name: 'Clothing Size', values: ['S', 'M', 'L', 'XL', 'XXL'], status: true }
     ]);
   },
 
@@ -1871,11 +1871,17 @@ export const dbService = {
     };
 
     try {
-      await fetch(isEdit ? `/api/attributes/${encodeURIComponent(id)}` : '/api/attributes', {
+      const res = await fetch(isEdit ? `/api/attributes/${encodeURIComponent(id)}` : '/api/attributes', {
         method: isEdit ? 'PUT' : 'POST',
         headers: getAdminAuthHeaders(),
         body: JSON.stringify(payload)
       });
+      if (res.ok) {
+        const savedData = await res.json();
+        if (savedData && savedData.id) {
+          payload.id = savedData.id;
+        }
+      }
     } catch {}
 
     const current = await this.getAttributes();

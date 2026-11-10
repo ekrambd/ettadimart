@@ -168,9 +168,11 @@ export default function ProductManager({
     loadData();
     window.addEventListener('ecom-settings-updated', loadData);
     window.addEventListener('brands-updated', loadData);
+    window.addEventListener('attributes-updated', loadData);
     return () => {
       window.removeEventListener('ecom-settings-updated', loadData);
       window.removeEventListener('brands-updated', loadData);
+      window.removeEventListener('attributes-updated', loadData);
     };
   }, []);
 
@@ -2068,8 +2070,19 @@ export default function ProductManager({
                       </div>
 
                       <div className="space-y-6">
-                        {storeAttributes && storeAttributes.length > 0 ? (
-                          storeAttributes.map((attr) => {
+                        {(() => {
+                          const activeAttributes = (storeAttributes || []).filter(attr => attr.status !== false);
+                          if (activeAttributes.length === 0) {
+                            return (
+                              <div className="py-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-1">
+                                <p className="text-xs font-bold text-slate-600">No active attributes found.</p>
+                                <p className="text-[11px] text-slate-400">
+                                  Go to Catalogue &gt; Attributes and click "Activate" on any attribute you want to use here.
+                                </p>
+                              </div>
+                            );
+                          }
+                          return activeAttributes.map((attr) => {
                             const selectedVals = selectedAttributesState[attr.name] || [];
                             const isColorAttr = attr.name.toLowerCase().includes('color') || attr.name.toLowerCase().includes('colour');
 
@@ -2169,10 +2182,8 @@ export default function ProductManager({
                                 </div>
                               </div>
                             );
-                          })
-                        ) : (
-                          <p className="text-xs text-slate-400">No custom attributes found. Go to Catalogue &gt; Attributes to add them.</p>
-                        )}
+                          });
+                        })()}
                       </div>
 
                       <div className="p-3.5 bg-emerald-50/80 border border-emerald-100 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
